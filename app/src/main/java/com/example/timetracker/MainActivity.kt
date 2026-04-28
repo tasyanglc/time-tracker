@@ -22,6 +22,9 @@ class MainActivity : AppCompatActivity() {
 
         val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
         
+        // Set indicator color programmatically to avoid XML attribute not found error
+        bottomNavigation.itemActiveIndicatorColor = getColorStateList(R.color.nav_indicator_gray)
+        
         bottomNavigation.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_home -> {
