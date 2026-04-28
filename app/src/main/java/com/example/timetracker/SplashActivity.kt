@@ -1,4 +1,4 @@
-package com.example.timetracker
+        package com.example.timetracker
 
 import android.content.Intent
 import android.os.Bundle
@@ -13,9 +13,9 @@ class SplashActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_splash)
         
-        // Menunggu selama 3 detik sebelum pindah ke MainActivity
+        // Menunggu selama 3 detik sebelum pindah ke OnboardingActivity
         Handler(Looper.getMainLooper()).postDelayed({
-            startActivity(Intent(this, MainActivity::class.java))
+            startActivity(Intent(this, OnboardingActivity::class.java))
             finish()
         }, 3000)
     }

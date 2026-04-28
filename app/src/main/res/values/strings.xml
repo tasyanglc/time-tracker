@@ -3,4 +3,8 @@
     <string name="splash_tagline">Effortless time management for a clearer day.</string>
     <string name="splash_starting_up">STARTING UP</string>
     <string name="splash_version">Version 2.0.4</string>
+    <string name="onboarding_title">Track Your Time</string>
+    <string name="onboarding_desc">Easily monitor where your hours go and stay productive.</string>
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_next">Next</string>
 </resources>
