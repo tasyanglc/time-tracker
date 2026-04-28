@@ -8,4 +8,6 @@
     <color name="text_primary">#1A1A1A</color>
     <color name="text_secondary">#757575</color>
     <color name="dot_inactive">#D9D9D9</color>
+    <color name="nav_yellow">#FFB300</color>
+    <color name="icon_bg">#F2F2F2</color>
 </resources>
