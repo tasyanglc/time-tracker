@@ -1,3 +1,6 @@
 <resources>
-    <string name="app_name">timetracker</string>
+    <string name="app_name">Momentum</string>
+    <string name="splash_tagline">Effortless time management for a clearer day.</string>
+    <string name="splash_starting_up">STARTING UP</string>
+    <string name="splash_version">Version 2.0.4</string>
 </resources>
