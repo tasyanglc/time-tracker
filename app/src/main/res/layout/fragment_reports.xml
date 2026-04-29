@@ -172,6 +172,41 @@
                     </LinearLayout>
                 </FrameLayout>
 
+                <GridLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="8dp"
+                    android:columnCount="2">
+
+                    <TextView
+                        style="@style/ChartLegend"
+                        android:layout_width="wrap_content"
+                        android:paddingEnd="16dp"
+                        android:text="Focus"
+                        app:drawableStartCompat="@drawable/dot_yellow" />
+
+                    <TextView
+                        style="@style/ChartLegend"
+                        android:layout_width="wrap_content"
+                        android:paddingEnd="16dp"
+                        android:text="Admin"
+                        app:drawableStartCompat="@drawable/dot_gray" />
+
+                    <TextView
+                        style="@style/ChartLegend"
+                        android:layout_width="wrap_content"
+                        android:paddingEnd="16dp"
+                        android:text="Leisure"
+                        app:drawableStartCompat="@drawable/dot_light_gray" />
+
+                    <TextView
+                        style="@style/ChartLegend"
+                        android:layout_width="wrap_content"
+                        android:paddingEnd="16dp"
+                        android:text="Health"
+                        app:drawableStartCompat="@drawable/dot_olive" />
+                </GridLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
