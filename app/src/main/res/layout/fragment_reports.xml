@@ -123,8 +123,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Time Distribution"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="14sp" />
+                    android:textColor="#555555"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
                 <!-- Mock Donut Chart -->
                 <FrameLayout
@@ -163,8 +164,9 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Total"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="12sp" />
+                            android:textColor="#555555"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
                     </LinearLayout>
                 </FrameLayout>
 
@@ -202,15 +204,17 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Weekly Trend"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="14sp" />
+                        android:textColor="#555555"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
                         android:text="+12% vs last week"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp" />
+                        android:textColor="@color/accent_olive"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
                 </RelativeLayout>
 
                 <!-- Mock Bar Chart -->

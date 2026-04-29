@@ -68,8 +68,9 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="September 2024"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="14sp" />
+                        android:textColor="#444444"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
 
                     <LinearLayout
                         android:layout_width="wrap_content"
@@ -156,8 +157,9 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="TOTAL TIME LOGGED"
-                        android:textColor="@color/text_secondary"
+                        android:textColor="#555555"
                         android:textSize="12sp"
+                        android:textStyle="bold"
                         android:letterSpacing="0.05" />
 
                     <TextView
@@ -200,8 +202,9 @@
                 android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"
                 android:text="Thursday, Sep 12"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
+                android:textColor="#555555"
+                android:textSize="14sp"
+                android:textStyle="bold" />
         </RelativeLayout>
 
         <androidx.recyclerview.widget.RecyclerView

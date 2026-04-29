@@ -74,8 +74,9 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="TODAY'S SUMMARY"
-                                android:textColor="@color/text_secondary"
+                                android:textColor="#555555"
                                 android:textSize="12sp"
+                                android:textStyle="bold"
                                 android:letterSpacing="0.05" />
 
                             <TextView
@@ -107,8 +108,9 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Daily Goal: 8h"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="14sp" />
+                            android:textColor="#555555"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/tvGoalPercentage"
@@ -116,7 +118,7 @@
                             android:layout_height="wrap_content"
                             android:layout_alignParentEnd="true"
                             android:text="84%"
-                            android:textColor="@color/accent_yellow"
+                            android:textColor="@color/accent_olive"
                             android:textSize="14sp"
                             android:textStyle="bold" />
                     </RelativeLayout>
@@ -153,7 +155,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:background="@drawable/bg_card_rounded"
-                        android:backgroundTint="#80FFFFFF"
+                        android:backgroundTint="#B3FFFFFF"
                         android:paddingHorizontal="12dp"
                         android:paddingVertical="4dp"
                         android:text="Current Task: Coding"
@@ -182,7 +184,7 @@
                             style="@style/Widget.Material3.Button.IconButton"
                             android:layout_width="48dp"
                             android:layout_height="48dp"
-                            android:backgroundTint="#40FFFFFF"
+                            android:backgroundTint="#80FFFFFF"
                             app:icon="@drawable/ic_timer"
                             app:iconTint="@color/text_primary" />
 
@@ -202,7 +204,7 @@
                             style="@style/Widget.Material3.Button.IconButton"
                             android:layout_width="48dp"
                             android:layout_height="48dp"
-                            android:backgroundTint="#40FFFFFF"
+                            android:backgroundTint="#80FFFFFF"
                             app:icon="@drawable/ic_timer"
                             app:iconTint="@color/text_primary" />
                     </LinearLayout>
