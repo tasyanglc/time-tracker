@@ -22,12 +22,12 @@ class OnboardingActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btnNext).setOnClickListener {
-            startActivity(Intent(this, MainActivity::class.java))
+            startActivity(Intent(this, RegisterActivity::class.java))
             finish()
         }
 
         findViewById<TextView>(R.id.tvSkip).setOnClickListener {
-            startActivity(Intent(this, MainActivity::class.java))
+            startActivity(Intent(this, RegisterActivity::class.java))
             finish()
         }
     }

@@ -27,7 +27,14 @@
             android:name=".MainActivity"
             android:exported="false" />
         <activity
-            android:name=".AddEditActivity" />
+            android:name=".AddEditActivity"
+            android:exported="true" />
+        <activity
+            android:name=".LoginActivity"
+            android:exported="true" />
+        <activity
+            android:name=".RegisterActivity"
+            android:exported="true" />
     </application>
 
 </manifest>
