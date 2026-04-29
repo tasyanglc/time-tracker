@@ -30,8 +30,8 @@ class LoginActivity : AppCompatActivity() {
             if (email.isNotEmpty() && password.isNotEmpty()) {
                 Toast.makeText(this, "Login Successful!", Toast.LENGTH_SHORT).show()
 
-                // Pindah ke halaman Home (MainActivity)
-                val intent = Intent(this, MainActivity::class.java)
+                // Pindah ke halaman Dashboard (DashboardActivity)
+                val intent = Intent(this, DashboardActivity::class.java)
                 startActivity(intent)
                 finish() // Agar tidak bisa 'back' ke halaman login lagi
             } else {

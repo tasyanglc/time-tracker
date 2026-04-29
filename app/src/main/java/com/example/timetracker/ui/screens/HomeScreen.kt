@@ -60,20 +60,26 @@ fun HomeScreen() {
             .fillMaxSize()
             .background(WarmBackground)
     ) {
-        // ── Scrollable Content ──
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(top = 56.dp, bottom = 130.dp)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            Spacer(Modifier.height(4.dp))
-            TodaySummaryCard()
-            ActiveTimerWidget()
-            RecentActivitiesSection()
-            Spacer(Modifier.height(8.dp))
+        // ── Konten berubah sesuai nav ──
+        when (selectedNavItem) {
+            0 -> Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(top = 56.dp, bottom = 130.dp)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                Spacer(Modifier.height(4.dp))
+                TodaySummaryCard()
+                ActiveTimerWidget()
+                RecentActivitiesSection()
+                Spacer(Modifier.height(8.dp))
+            }
+            1 -> PlaceholderScreen("History")
+            2 -> PlaceholderScreen("Start")
+            3 -> PlaceholderScreen("Reports")
+            4 -> PlaceholderScreen("Settings")
         }
 
         // ── Top App Bar (fixed) ──
@@ -96,6 +102,22 @@ fun HomeScreen() {
             selectedIndex = selectedNavItem,
             onItemSelected = { selectedNavItem = it },
             modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+}
+
+@Composable
+fun PlaceholderScreen(title: String) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = title,
+            fontFamily = ManropeFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 24.sp,
+            color = OnSurface
         )
     }
 }
