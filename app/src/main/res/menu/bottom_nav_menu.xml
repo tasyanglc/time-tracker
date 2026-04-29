@@ -3,15 +3,15 @@
     <item
         android:id="@+id/nav_home"
         android:icon="@drawable/ic_home"
-        android:title="Home" />
+        android:title="Dashboard" />
     <item
         android:id="@+id/nav_history"
         android:icon="@drawable/ic_calendar"
-        android:title="History" />
+        android:title="Calendar" />
     <item
         android:id="@+id/nav_play"
         android:icon="@drawable/ic_play"
-        android:title="Play" />
+        android:title="Start" />
     <item
         android:id="@+id/nav_reports"
         android:icon="@drawable/ic_reports"
@@ -19,5 +19,5 @@
     <item
         android:id="@+id/nav_settings"
         android:icon="@drawable/ic_settings"
-        android:title="Settings" />
+        android:title="Profile" />
 </menu>
