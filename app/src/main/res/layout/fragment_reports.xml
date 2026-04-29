@@ -140,13 +140,15 @@
                         android:progress="100"
                         android:progressDrawable="@drawable/donut_bg"
                         style="?android:attr/progressBarStyleHorizontal" />
+
                     <ProgressBar
+                        style="?android:attr/progressBarStyleHorizontal"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:indeterminate="false"
                         android:progress="60"
-                        android:progressDrawable="@drawable/donut_progress"
-                        style="?android:attr/progressBarStyleHorizontal" />
+                        android:progressDrawable="@drawable/donut_progress" />
+
                     <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -170,15 +172,6 @@
                     </LinearLayout>
                 </FrameLayout>
 
-                <GridLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:columnCount="2">
-                    <TextView style="@style/ChartLegend" android:text="Focus" app:drawableStartCompat="@drawable/dot_yellow" />
-                    <TextView style="@style/ChartLegend" android:text="Admin" app:drawableStartCompat="@drawable/dot_gray" />
-                    <TextView style="@style/ChartLegend" android:text="Leisure" app:drawableStartCompat="@drawable/dot_light_gray" />
-                    <TextView style="@style/ChartLegend" android:text="Health" app:drawableStartCompat="@drawable/dot_olive" />
-                </GridLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
