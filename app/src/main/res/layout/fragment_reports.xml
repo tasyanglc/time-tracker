@@ -143,6 +143,7 @@
 
                     <!-- Multi-colored segments -->
                     <ProgressBar
+                        android:id="@+id/pbFocus"
                         style="?android:attr/progressBarStyleHorizontal"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
@@ -151,6 +152,7 @@
                         android:progressDrawable="@drawable/donut_segment_focus" />
 
                     <ProgressBar
+                        android:id="@+id/pbAdmin"
                         style="?android:attr/progressBarStyleHorizontal"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
@@ -159,6 +161,7 @@
                         android:progressDrawable="@drawable/donut_segment_admin" />
 
                     <ProgressBar
+                        android:id="@+id/pbLeisure"
                         style="?android:attr/progressBarStyleHorizontal"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
@@ -167,6 +170,7 @@
                         android:progressDrawable="@drawable/donut_segment_leisure" />
 
                     <ProgressBar
+                        android:id="@+id/pbHealth"
                         style="?android:attr/progressBarStyleHorizontal"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
@@ -181,6 +185,7 @@
                         android:gravity="center"
                         android:orientation="vertical">
                         <TextView
+                            android:id="@+id/tvTotalTimeReports"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="32.5h"

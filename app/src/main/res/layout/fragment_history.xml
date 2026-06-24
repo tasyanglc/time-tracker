@@ -163,6 +163,7 @@
                         android:letterSpacing="0.05" />
 
                     <TextView
+                        android:id="@+id/tvTotalTimeLogged"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="6h 42m"
