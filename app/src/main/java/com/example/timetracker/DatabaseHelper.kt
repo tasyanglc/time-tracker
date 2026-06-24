@@ -28,28 +28,27 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     }
 
     override fun onCreate(db: SQLiteDatabase?) {
-        val createTable = ("CREATE TABLE " + TABLE_NAME + " ("
+        val createTable = ("CREATE TABLE IF NOT EXISTS " + TABLE_NAME + " ("
                 + COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + COLUMN_USERNAME + " TEXT UNIQUE, "
                 + COLUMN_EMAIL + " TEXT UNIQUE, "
                 + COLUMN_PASSWORD + " TEXT)")
         db?.execSQL(createTable)
 
-        val createActivitiesTable = ("CREATE TABLE " + TABLE_ACTIVITIES + " ("
-                + COLUMN_ACT_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
-                + COLUMN_ACT_NAME + " TEXT, "
-                + COLUMN_ACT_PROJECT + " TEXT, "
-                + COLUMN_ACT_CATEGORY + " TEXT, "
-                + COLUMN_ACT_DURATION + " INTEGER, "
-                + COLUMN_ACT_NOTES + " TEXT, "
-                + COLUMN_ACT_DATE + " INTEGER, "
-                + COLUMN_ACT_TIME + " TEXT)")
-        db?.execSQL(createActivitiesTable)
+        if (db != null) {
+            ensureActivitiesTableExists(db)
+        }
     }
 
     override fun onUpgrade(db: SQLiteDatabase?, oldVersion: Int, newVersion: Int) {
-        if (oldVersion < 2) {
-            val createActivitiesTable = ("CREATE TABLE " + TABLE_ACTIVITIES + " ("
+        if (db != null) {
+            ensureActivitiesTableExists(db)
+        }
+    }
+
+    private fun ensureActivitiesTableExists(db: SQLiteDatabase) {
+        try {
+            val createActivitiesTable = ("CREATE TABLE IF NOT EXISTS " + TABLE_ACTIVITIES + " ("
                     + COLUMN_ACT_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
                     + COLUMN_ACT_NAME + " TEXT, "
                     + COLUMN_ACT_PROJECT + " TEXT, "
@@ -58,139 +57,175 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                     + COLUMN_ACT_NOTES + " TEXT, "
                     + COLUMN_ACT_DATE + " INTEGER, "
                     + COLUMN_ACT_TIME + " TEXT)")
-            db?.execSQL(createActivitiesTable)
+            db.execSQL(createActivitiesTable)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
     fun addUser(username: String, email: String, password: String): Long {
-        val db = this.writableDatabase
-        val values = ContentValues()
-        values.put(COLUMN_USERNAME, username)
-        values.put(COLUMN_EMAIL, email)
-        values.put(COLUMN_PASSWORD, password)
-        val result = db.insert(TABLE_NAME, null, values)
-        db.close()
-        return result
+        return try {
+            val db = this.writableDatabase
+            val values = ContentValues()
+            values.put(COLUMN_USERNAME, username)
+            values.put(COLUMN_EMAIL, email)
+            values.put(COLUMN_PASSWORD, password)
+            db.insert(TABLE_NAME, null, values)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            -1L
+        }
     }
 
     fun addActivity(name: String, project: String, category: String, duration: Int, notes: String, date: Long, time: String): Long {
-        val db = this.writableDatabase
-        val values = ContentValues()
-        values.put(COLUMN_ACT_NAME, name)
-        values.put(COLUMN_ACT_PROJECT, project)
-        values.put(COLUMN_ACT_CATEGORY, category)
-        values.put(COLUMN_ACT_DURATION, duration)
-        values.put(COLUMN_ACT_NOTES, notes)
-        values.put(COLUMN_ACT_DATE, date)
-        values.put(COLUMN_ACT_TIME, time)
-        val result = db.insert(TABLE_ACTIVITIES, null, values)
-        db.close()
-        return result
+        return try {
+            val db = this.writableDatabase
+            ensureActivitiesTableExists(db)
+            val values = ContentValues()
+            values.put(COLUMN_ACT_NAME, name)
+            values.put(COLUMN_ACT_PROJECT, project)
+            values.put(COLUMN_ACT_CATEGORY, category)
+            values.put(COLUMN_ACT_DURATION, duration)
+            values.put(COLUMN_ACT_NOTES, notes)
+            values.put(COLUMN_ACT_DATE, date)
+            values.put(COLUMN_ACT_TIME, time)
+            db.insert(TABLE_ACTIVITIES, null, values)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            -1L
+        }
     }
 
     fun getActivitiesByDate(dateMillis: Long): List<ActivityRecord> {
-        val db = this.readableDatabase
         val list = mutableListOf<ActivityRecord>()
-        
-        val cal = java.util.Calendar.getInstance()
-        cal.timeInMillis = dateMillis
-        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
-        cal.set(java.util.Calendar.MINUTE, 0)
-        cal.set(java.util.Calendar.SECOND, 0)
-        cal.set(java.util.Calendar.MILLISECOND, 0)
-        val start = cal.timeInMillis
-        val end = start + (24 * 60 * 60 * 1000) - 1
+        try {
+            val db = this.readableDatabase
+            val writeDb = this.writableDatabase
+            ensureActivitiesTableExists(writeDb)
 
-        val cursor = db.rawQuery("SELECT * FROM $TABLE_ACTIVITIES WHERE $COLUMN_ACT_DATE BETWEEN ? AND ?", arrayOf(start.toString(), end.toString()))
-        if (cursor.moveToFirst()) {
-            do {
-                list.add(ActivityRecord(
-                    cursor.getInt(0),
-                    cursor.getString(1),
-                    cursor.getString(2),
-                    cursor.getString(3),
-                    cursor.getInt(4),
-                    cursor.getString(5),
-                    cursor.getLong(6),
-                    cursor.getString(7)
-                ))
-            } while (cursor.moveToNext())
+            val cal = java.util.Calendar.getInstance()
+            cal.timeInMillis = dateMillis
+            cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            cal.set(java.util.Calendar.MINUTE, 0)
+            cal.set(java.util.Calendar.SECOND, 0)
+            cal.set(java.util.Calendar.MILLISECOND, 0)
+            val start = cal.timeInMillis
+            val end = start + (24 * 60 * 60 * 1000) - 1
+
+            val cursor = db.rawQuery("SELECT * FROM $TABLE_ACTIVITIES WHERE $COLUMN_ACT_DATE BETWEEN ? AND ?", arrayOf(start.toString(), end.toString()))
+            if (cursor.moveToFirst()) {
+                do {
+                    list.add(ActivityRecord(
+                        cursor.getInt(0),
+                        cursor.getString(1),
+                        cursor.getString(2),
+                        cursor.getString(3),
+                        cursor.getInt(4),
+                        cursor.getString(5),
+                        cursor.getLong(6),
+                        cursor.getString(7)
+                    ))
+                } while (cursor.moveToNext())
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        cursor.close()
-        db.close()
         return list
     }
 
     fun getAllActivities(): List<ActivityRecord> {
-        val db = this.readableDatabase
         val list = mutableListOf<ActivityRecord>()
-        val cursor = db.rawQuery("SELECT * FROM $TABLE_ACTIVITIES", null)
-        if (cursor.moveToFirst()) {
-            do {
-                list.add(ActivityRecord(
-                    cursor.getInt(0),
-                    cursor.getString(1),
-                    cursor.getString(2),
-                    cursor.getString(3),
-                    cursor.getInt(4),
-                    cursor.getString(5),
-                    cursor.getLong(6),
-                    cursor.getString(7)
-                ))
-            } while (cursor.moveToNext())
+        try {
+            val db = this.readableDatabase
+            val writeDb = this.writableDatabase
+            ensureActivitiesTableExists(writeDb)
+
+            val cursor = db.rawQuery("SELECT * FROM $TABLE_ACTIVITIES", null)
+            if (cursor.moveToFirst()) {
+                do {
+                    list.add(ActivityRecord(
+                        cursor.getInt(0),
+                        cursor.getString(1),
+                        cursor.getString(2),
+                        cursor.getString(3),
+                        cursor.getInt(4),
+                        cursor.getString(5),
+                        cursor.getLong(6),
+                        cursor.getString(7)
+                    ))
+                } while (cursor.moveToNext())
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        cursor.close()
-        db.close()
         return list
     }
 
     fun checkUser(usernameOrEmail: String, password: String): Boolean {
-        val db = this.readableDatabase
-        val cursor = db.rawQuery(
-            "SELECT * FROM $TABLE_NAME WHERE ($COLUMN_USERNAME = ? OR $COLUMN_EMAIL = ?) AND $COLUMN_PASSWORD = ?",
-            arrayOf(usernameOrEmail, usernameOrEmail, password)
-        )
-        val exists = cursor.count > 0
-        cursor.close()
-        db.close()
-        return exists
+        return try {
+            val db = this.readableDatabase
+            val cursor = db.rawQuery(
+                "SELECT * FROM $TABLE_NAME WHERE ($COLUMN_USERNAME = ? OR $COLUMN_EMAIL = ?) AND $COLUMN_PASSWORD = ?",
+                arrayOf(usernameOrEmail, usernameOrEmail, password)
+            )
+            val exists = cursor.count > 0
+            cursor.close()
+            exists
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 
     fun isUsernameTaken(username: String): Boolean {
-        val db = this.readableDatabase
-        val cursor = db.rawQuery("SELECT * FROM $TABLE_NAME WHERE $COLUMN_USERNAME = ?", arrayOf(username))
-        val exists = cursor.count > 0
-        cursor.close()
-        db.close()
-        return exists
+        return try {
+            val db = this.readableDatabase
+            val cursor = db.rawQuery("SELECT * FROM $TABLE_NAME WHERE $COLUMN_USERNAME = ?", arrayOf(username))
+            val exists = cursor.count > 0
+            cursor.close()
+            exists
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 
     fun isEmailTaken(email: String): Boolean {
-        val db = this.readableDatabase
-        val cursor = db.rawQuery("SELECT * FROM $TABLE_NAME WHERE $COLUMN_EMAIL = ?", arrayOf(email))
-        val exists = cursor.count > 0
-        cursor.close()
-        db.close()
-        return exists
+        return try {
+            val db = this.readableDatabase
+            val cursor = db.rawQuery("SELECT * FROM $TABLE_NAME WHERE $COLUMN_EMAIL = ?", arrayOf(email))
+            val exists = cursor.count > 0
+            cursor.close()
+            exists
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 
     fun getUserDetails(usernameOrEmail: String): Map<String, String>? {
-        val db = this.readableDatabase
-        val cursor = db.rawQuery(
-            "SELECT $COLUMN_USERNAME, $COLUMN_EMAIL FROM $TABLE_NAME WHERE $COLUMN_USERNAME = ? OR $COLUMN_EMAIL = ?",
-            arrayOf(usernameOrEmail, usernameOrEmail)
-        )
-        
-        var userDetails: Map<String, String>? = null
-        if (cursor.moveToFirst()) {
-            userDetails = mapOf(
-                "username" to cursor.getString(0),
-                "email" to cursor.getString(1)
+        return try {
+            val db = this.readableDatabase
+            val cursor = db.rawQuery(
+                "SELECT $COLUMN_USERNAME, $COLUMN_EMAIL FROM $TABLE_NAME WHERE $COLUMN_USERNAME = ? OR $COLUMN_EMAIL = ?",
+                arrayOf(usernameOrEmail, usernameOrEmail)
             )
+            
+            var userDetails: Map<String, String>? = null
+            if (cursor.moveToFirst()) {
+                userDetails = mapOf(
+                    "username" to cursor.getString(0),
+                    "email" to cursor.getString(1)
+                )
+            }
+            cursor.close()
+            userDetails
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
-        cursor.close()
-        db.close()
-        return userDetails
     }
 }
 

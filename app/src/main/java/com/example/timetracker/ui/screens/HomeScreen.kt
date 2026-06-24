@@ -1,20 +1,27 @@
 package com.example.timetracker.ui.screens
 
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,16 +29,22 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import com.example.timetracker.ActivityRecord
+import com.example.timetracker.DatabaseHelper
 import com.example.timetracker.ui.theme.*
-
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import kotlinx.coroutines.delay
 
 // DATA CLASSES
-
 data class ActivityItem(
     val icon: ImageVector,
     val iconBgColor: Color,
@@ -47,104 +60,105 @@ data class NavItem(
     val selectedIcon: ImageVector,
 )
 
-
-// HOME SCREEN
-
-@Composable
-fun HomeScreen() {
-    val scrollState = rememberScrollState()
-    var selectedNavItem by remember { mutableIntStateOf(0) }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(WarmBackground)
-    ) {
-        // ── Konten berubah sesuai nav ──
-        when (selectedNavItem) {
-            0 -> Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(top = 56.dp, bottom = 130.dp)
-                    .padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                Spacer(Modifier.height(4.dp))
-                TodaySummaryCard()
-                ActiveTimerWidget()
-                RecentActivitiesSection()
-                Spacer(Modifier.height(8.dp))
-            }
-            1 -> PlaceholderScreen("History")
-            2 -> PlaceholderScreen("Start")
-            3 -> PlaceholderScreen("Reports")
-            4 -> PlaceholderScreen("Settings")
-        }
-
-        // ── Top App Bar (fixed) ──
-        MomentumTopBar(
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
-
-        // ── FAB (fixed, above bottom nav) ──
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .navigationBarsPadding()
-                .padding(bottom = 120.dp, end = 24.dp)
-        ) {
-            AddFab()
-        }
-
-        // ── Bottom Nav (fixed) ──
-        MomentumBottomNav(
-            selectedIndex = selectedNavItem,
-            onItemSelected = { selectedNavItem = it },
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
-    }
+// ACTIVE TIMER STATE HOLDER
+object TimerState {
+    var isRunning by mutableStateOf(false)
+    var isPaused by mutableStateOf(false)
+    var secondsElapsed by mutableStateOf(0L)
+    var currentTaskName by mutableStateOf("")
+    var currentProject by mutableStateOf("")
 }
 
+// HOME SCREEN (DASHBOARD CONTAINER)
 @Composable
-fun PlaceholderScreen(title: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = title,
-            fontFamily = ManropeFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 24.sp,
-            color = OnSurface
-        )
+fun HomeScreen(navController: NavController) {
+    val context = LocalContext.current
+    val dbHelper = remember { DatabaseHelper(context) }
+    
+    val scrollState = rememberScrollState()
+    var selectedNavItem by rememberSaveable { mutableIntStateOf(0) }
+    
+    // Ticker logic for global timer
+    LaunchedEffect(TimerState.isRunning, TimerState.isPaused) {
+        if (TimerState.isRunning && !TimerState.isPaused) {
+            while (true) {
+                delay(1000)
+                TimerState.secondsElapsed++
+            }
+        }
+    }
+
+    // Refresh triggers to refresh database lists when screens change
+    var refreshTrigger by remember { mutableStateOf(0) }
+    
+    Scaffold(
+        topBar = {
+            MomentumTopBar()
+        },
+        bottomBar = {
+            MomentumBottomNav(
+                selectedIndex = selectedNavItem,
+                onItemSelected = { selectedNavItem = it }
+            )
+        },
+        floatingActionButton = {
+            if (selectedNavItem == 0) {
+                AddFab(onClick = { navController.navigate("add_edit") })
+            }
+        },
+        containerColor = WarmBackground
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            // ── Navigation routing for internal tabs ──
+            when (selectedNavItem) {
+                0 -> Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    TodaySummaryCard(dbHelper, refreshTrigger)
+                    ActiveTimerWidget(onTimerAction = { selectedNavItem = 2 })
+                    RecentActivitiesSection(dbHelper, refreshTrigger)
+                }
+                1 -> HistoryTabContent(dbHelper)
+                2 -> PlayTabContent(dbHelper, onSaved = {
+                    refreshTrigger++
+                    selectedNavItem = 0
+                })
+                3 -> ReportsTabContent(dbHelper)
+                4 -> SettingsTabContent(navController)
+            }
+        }
     }
 }
 
 // TOP APP BAR
-
 @Composable
 fun MomentumTopBar(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val sharedPref = remember { context.getSharedPreferences("UserSession", Context.MODE_PRIVATE) }
+    val username = sharedPref.getString("username", "User") ?: "User"
+    val initial = if (username.isNotEmpty()) username.take(1).uppercase() else "U"
+
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .statusBarsPadding()
             .background(WarmBackground)
             .padding(horizontal = 20.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left: Hamburger + App Name
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Menu,
-                contentDescription = "Menu",
-                tint = OnSurface,
-                modifier = Modifier.size(24.dp)
-            )
             Text(
                 text = "Momentum",
                 fontFamily = ManropeFontFamily,
@@ -164,7 +178,7 @@ fun MomentumTopBar(modifier: Modifier = Modifier) {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "J",
+                text = initial,
                 fontFamily = ManropeFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
@@ -175,9 +189,21 @@ fun MomentumTopBar(modifier: Modifier = Modifier) {
 }
 
 // TODAY'S SUMMARY CARD
-
 @Composable
-fun TodaySummaryCard() {
+fun TodaySummaryCard(dbHelper: DatabaseHelper, refreshTrigger: Int) {
+    var todayRecords by remember { mutableStateOf<List<ActivityRecord>>(emptyList()) }
+    
+    LaunchedEffect(refreshTrigger) {
+        todayRecords = dbHelper.getActivitiesByDate(System.currentTimeMillis())
+    }
+    
+    val totalMinutes = todayRecords.sumOf { it.duration }
+    val hours = totalMinutes / 60
+    val mins = totalMinutes % 60
+    
+    // Daily goal is 8 hours (480 minutes)
+    val percentage = if (totalMinutes > 0) (totalMinutes * 100 / 480).coerceAtMost(100) else 0
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -191,7 +217,7 @@ fun TodaySummaryCard() {
         colors = CardDefaults.cardColors(
             containerColor = SurfaceContainerLowest,
         ),
-        border = androidx.compose.foundation.BorderStroke(
+        border = BorderStroke(
             width = 0.5.dp,
             color = CardBorder.copy(alpha = 0.3f)
         )
@@ -199,7 +225,6 @@ fun TodaySummaryCard() {
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -216,7 +241,7 @@ fun TodaySummaryCard() {
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "6h 45m",
+                        text = "${hours}h ${mins}m",
                         fontFamily = ManropeFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 32.sp,
@@ -226,7 +251,6 @@ fun TodaySummaryCard() {
                     )
                 }
 
-                // Icon Badge
                 Box(
                     modifier = Modifier
                         .size(48.dp)
@@ -245,7 +269,6 @@ fun TodaySummaryCard() {
 
             Spacer(Modifier.height(16.dp))
 
-            // Progress Section
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -259,7 +282,7 @@ fun TodaySummaryCard() {
                     color = OnSurfaceVariant,
                 )
                 Text(
-                    text = "84%",
+                    text = "$percentage%",
                     fontFamily = ManropeFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
@@ -279,7 +302,7 @@ fun TodaySummaryCard() {
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.84f)
+                        .fillMaxWidth(percentage / 100f)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(50))
                         .background(PrimaryContainer)
@@ -289,10 +312,11 @@ fun TodaySummaryCard() {
     }
 }
 
-// ACTIVE TIMER WIDGET
-
+// ACTIVE TIMER WIDGET (HOME SHORTCUT)
 @Composable
-fun ActiveTimerWidget() {
+fun ActiveTimerWidget(onTimerAction: () -> Unit) {
+    val timeString = formatElapsedTime(TimerState.secondsElapsed)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -304,8 +328,9 @@ fun ActiveTimerWidget() {
             )
             .clip(RoundedCornerShape(32.dp))
             .background(PrimaryContainer)
+            .clickable { onTimerAction() }
     ) {
-        // Decorative circle (top-right background element)
+        // Decorative background element
         Box(
             modifier = Modifier
                 .size(128.dp)
@@ -322,7 +347,6 @@ fun ActiveTimerWidget() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Task Chip
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
@@ -330,7 +354,7 @@ fun ActiveTimerWidget() {
                     .padding(horizontal = 12.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = "Current Task: Coding",
+                    text = if (TimerState.isRunning) "Timer Active: ${TimerState.currentTaskName}" else "Start Tracking Time",
                     fontFamily = ManropeFontFamily,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
@@ -338,9 +362,8 @@ fun ActiveTimerWidget() {
                 )
             }
 
-            // Timer Display
             Text(
-                text = "00:42:15",
+                text = timeString,
                 fontFamily = ManropeFontFamily,
                 fontWeight = FontWeight.Black,
                 fontSize = 48.sp,
@@ -350,51 +373,53 @@ fun ActiveTimerWidget() {
                 textAlign = TextAlign.Center,
             )
 
-            // Control Buttons
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Pause Button (small)
-                TimerControlButton(
-                    size = 48,
-                    bgColor = Color.White.copy(alpha = 0.3f),
-                    onClick = {}
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Pause,
-                        contentDescription = "Pause",
-                        tint = OnPrimaryFixed,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                if (TimerState.isRunning) {
+                    // Pause/Resume Button
+                    TimerControlButton(
+                        size = 48,
+                        bgColor = Color.White.copy(alpha = 0.3f),
+                        onClick = { TimerState.isPaused = !TimerState.isPaused }
+                    ) {
+                        Icon(
+                            imageVector = if (TimerState.isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                            contentDescription = if (TimerState.isPaused) "Resume" else "Pause",
+                            tint = OnPrimaryFixed,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
 
-                // Stop Button (large, primary action)
-                TimerControlButton(
-                    size = 64,
-                    bgColor = OnPrimaryFixed,
-                    onClick = {}
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Stop,
-                        contentDescription = "Stop",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
+                    // Open Timer Screen directly
+                    Text(
+                        text = "Manage Timer",
+                        fontFamily = ManropeFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = OnPrimaryFixed,
+                        modifier = Modifier.clickable { onTimerAction() }
                     )
-                }
-
-                // Refresh Button (small)
-                TimerControlButton(
-                    size = 48,
-                    bgColor = Color.White.copy(alpha = 0.3f),
-                    onClick = {}
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Restart",
-                        tint = OnPrimaryFixed,
-                        modifier = Modifier.size(24.dp)
-                    )
+                } else {
+                    // Fast Launch Button
+                    TimerControlButton(
+                        size = 56,
+                        bgColor = OnPrimaryFixed,
+                        onClick = {
+                            TimerState.isRunning = true
+                            TimerState.isPaused = false
+                            TimerState.secondsElapsed = 0
+                            onTimerAction()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = "Start",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
             }
         }
@@ -425,38 +450,15 @@ fun TimerControlButton(
 }
 
 // RECENT ACTIVITIES SECTION
-
 @Composable
-fun RecentActivitiesSection() {
-    val activities = listOf(
-        ActivityItem(
-            icon = Icons.Outlined.Palette,
-            iconBgColor = TertiaryFixed,
-            iconTintColor = OnTertiaryFixed,
-            title = "Design Sync",
-            timeRange = "10:00 AM - 11:30 AM",
-            duration = "1h 30m",
-        ),
-        ActivityItem(
-            icon = Icons.Outlined.Email,
-            iconBgColor = SecondaryContainer,
-            iconTintColor = OnSecondaryContainer,
-            title = "Email Management",
-            timeRange = "08:45 AM - 09:15 AM",
-            duration = "30m",
-        ),
-        ActivityItem(
-            icon = Icons.Outlined.LocalCafe,
-            iconBgColor = CoffeeIconBg,
-            iconTintColor = CoffeeIconColor,
-            title = "Quick Break",
-            timeRange = "08:30 AM - 08:45 AM",
-            duration = "15m",
-        ),
-    )
+fun RecentActivitiesSection(dbHelper: DatabaseHelper, refreshTrigger: Int) {
+    var records by remember { mutableStateOf<List<ActivityRecord>>(emptyList()) }
+    
+    LaunchedEffect(refreshTrigger) {
+        records = dbHelper.getAllActivities().takeLast(3).reversed()
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        // Section Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -473,21 +475,55 @@ fun RecentActivitiesSection() {
                 letterSpacing = (-0.24).sp,
                 color = OnSurface,
             )
-            TextButton(onClick = {}) {
-                Text(
-                    text = "View All",
-                    fontFamily = ManropeFontFamily,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    color = Primary,
-                )
-            }
         }
 
-        // Activity Items
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            activities.forEach { activity ->
-                ActivityCard(activity = activity)
+        if (records.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No activities logged yet.",
+                    fontFamily = ManropeFontFamily,
+                    color = OnSurfaceVariant.copy(alpha = 0.6f),
+                    fontSize = 14.sp
+                )
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                records.forEach { record ->
+                    val icon = when (record.category) {
+                        "Admin" -> Icons.Outlined.Email
+                        "Leisure" -> Icons.Outlined.LocalCafe
+                        "Health" -> Icons.Outlined.DirectionsRun
+                        else -> Icons.Outlined.Palette
+                    }
+                    val iconBg = when (record.category) {
+                        "Admin" -> SecondaryContainer
+                        "Leisure" -> CoffeeIconBg
+                        "Health" -> TertiaryFixed
+                        else -> PrimaryContainer.copy(alpha = 0.3f)
+                    }
+                    val iconTint = when (record.category) {
+                        "Admin" -> OnSecondaryContainer
+                        "Leisure" -> CoffeeIconColor
+                        "Health" -> OnTertiaryFixed
+                        else -> Primary
+                    }
+
+                    ActivityCard(
+                        ActivityItem(
+                            icon = icon,
+                            iconBgColor = iconBg,
+                            iconTintColor = iconTint,
+                            title = record.name,
+                            timeRange = "${record.startTime} • ${record.project}",
+                            duration = "${record.duration}m"
+                        )
+                    )
+                }
             }
         }
     }
@@ -520,7 +556,6 @@ fun ActivityCard(activity: ActivityItem) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Icon Container
                 Box(
                     modifier = Modifier
                         .size(48.dp)
@@ -536,7 +571,6 @@ fun ActivityCard(activity: ActivityItem) {
                     )
                 }
 
-                // Title & Time Range
                 Column {
                     Text(
                         text = activity.title,
@@ -551,17 +585,15 @@ fun ActivityCard(activity: ActivityItem) {
                         fontFamily = ManropeFontFamily,
                         fontWeight = FontWeight.Medium,
                         fontSize = 12.sp,
-                        letterSpacing = 0.6.sp,
                         color = Outline,
                     )
                 }
             }
 
-            // Duration
             Text(
                 text = activity.duration,
                 fontFamily = ManropeFontFamily,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
                 color = OnSurfaceVariant,
             )
@@ -569,10 +601,764 @@ fun ActivityCard(activity: ActivityItem) {
     }
 }
 
-// FAB (Floating Action Button)
+// HISTORY TAB CONTENT
+@Composable
+fun HistoryTabContent(dbHelper: DatabaseHelper) {
+    val calendar = remember { Calendar.getInstance() }
+    var selectedDate by remember { mutableStateOf(calendar.timeInMillis) }
+    
+    val selectedCal = remember(selectedDate) {
+        Calendar.getInstance().apply { timeInMillis = selectedDate }
+    }
+    
+    val currentMonthYear = remember(selectedDate) {
+        val sdf = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+        sdf.format(selectedCal.time)
+    }
+
+    val dayList = remember(selectedDate) {
+        // Generate list of days in selected date's month
+        val tempCal = selectedCal.clone() as Calendar
+        tempCal.set(Calendar.DAY_OF_MONTH, 1)
+        val maxDays = tempCal.getActualMaximum(Calendar.DAY_OF_MONTH)
+        (1..maxDays).map { day ->
+            val dayCal = tempCal.clone() as Calendar
+            dayCal.set(Calendar.DAY_OF_MONTH, day)
+            dayCal.timeInMillis
+        }
+    }
+
+    var records by remember { mutableStateOf<List<ActivityRecord>>(emptyList()) }
+    LaunchedEffect(selectedDate) {
+        records = dbHelper.getActivitiesByDate(selectedDate)
+    }
+    val totalTime = records.sumOf { it.duration }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "History",
+            fontFamily = ManropeFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 24.sp,
+            color = OnSurface
+        )
+
+        // Month Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = {
+                val temp = Calendar.getInstance().apply { timeInMillis = selectedDate }
+                temp.add(Calendar.MONTH, -1)
+                selectedDate = temp.timeInMillis
+            }) {
+                Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Prev", tint = Primary)
+            }
+            
+            Text(
+                text = currentMonthYear,
+                fontFamily = ManropeFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = OnSurface
+            )
+
+            IconButton(onClick = {
+                val temp = Calendar.getInstance().apply { timeInMillis = selectedDate }
+                temp.add(Calendar.MONTH, 1)
+                selectedDate = temp.timeInMillis
+            }) {
+                Icon(imageVector = Icons.Default.ArrowForward, contentDescription = "Next", tint = Primary)
+            }
+        }
+
+        // Horizontal Scrollable Calendar Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+                .verticalScroll(rememberScrollState()) // Allow simple wrapping or row, but we can do horizontal grid
+        ) {
+            // Display days of the week in a simpler list: showing 7 days around selected date
+            val centerCal = Calendar.getInstance().apply { timeInMillis = selectedDate }
+            val centerDay = centerCal.get(Calendar.DAY_OF_MONTH)
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // Show 7 days around the selected date
+                val startCal = centerCal.clone() as Calendar
+                startCal.add(Calendar.DAY_OF_MONTH, -3)
+                
+                (0..6).forEach { _ ->
+                    val time = startCal.timeInMillis
+                    val dayNum = startCal.get(Calendar.DAY_OF_MONTH)
+                    val isSelected = isSameDay(time, selectedDate)
+                    
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) PrimaryContainer else Color.Transparent)
+                            .clickable { selectedDate = time },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = dayNum.toString(),
+                            fontFamily = ManropeFontFamily,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) OnPrimaryFixed else OnSurface,
+                            fontSize = 14.sp
+                        )
+                    }
+                    startCal.add(Calendar.DAY_OF_MONTH, 1)
+                }
+            }
+        }
+
+        // Total Time Logged
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = PrimaryContainer.copy(alpha = 0.15f))
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Total Time Logged",
+                    fontFamily = ManropeFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    color = Primary
+                )
+                Text(
+                    text = "${totalTime / 60}h ${totalTime % 60}m",
+                    fontFamily = ManropeFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Primary
+                )
+            }
+        }
+
+        // Activities List
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (records.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 48.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No activities on this day.",
+                            fontFamily = ManropeFontFamily,
+                            color = OnSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+            } else {
+                items(records) { record ->
+                    val icon = when (record.category) {
+                        "Admin" -> Icons.Outlined.Email
+                        "Leisure" -> Icons.Outlined.LocalCafe
+                        "Health" -> Icons.Outlined.DirectionsRun
+                        else -> Icons.Outlined.Palette
+                    }
+                    val iconBg = when (record.category) {
+                        "Admin" -> SecondaryContainer
+                        "Leisure" -> CoffeeIconBg
+                        "Health" -> TertiaryFixed
+                        else -> PrimaryContainer.copy(alpha = 0.3f)
+                    }
+                    val iconTint = when (record.category) {
+                        "Admin" -> OnSecondaryContainer
+                        "Leisure" -> CoffeeIconColor
+                        "Health" -> OnTertiaryFixed
+                        else -> Primary
+                    }
+
+                    ActivityCard(
+                        ActivityItem(
+                            icon = icon,
+                            iconBgColor = iconBg,
+                            iconTintColor = iconTint,
+                            title = record.name,
+                            timeRange = "${record.startTime} • ${record.project}",
+                            duration = "${record.duration}m"
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+// PLAY / START TIMER TAB CONTENT
+@Composable
+fun PlayTabContent(dbHelper: DatabaseHelper, onSaved: () -> Unit) {
+    val context = LocalContext.current
+    var isProjectDropdownExpanded by remember { mutableStateOf(false) }
+    val projectList = listOf("Work", "Education", "Personal", "Health", "Hobby", "Finance", "Social")
+
+    val timeString = formatElapsedTime(TimerState.secondsElapsed)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        Text(
+            text = "Track Session",
+            fontFamily = ManropeFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 24.sp,
+            color = OnSurface,
+            modifier = Modifier.align(Alignment.Start)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Timer Display
+        Card(
+            modifier = Modifier
+                .size(240.dp)
+                .shadow(elevation = 6.dp, shape = CircleShape, spotColor = PrimaryContainer),
+            shape = CircleShape,
+            colors = CardDefaults.cardColors(containerColor = SurfaceContainerLowest),
+            border = BorderStroke(4.dp, PrimaryContainer)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = timeString,
+                        fontFamily = ManropeFontFamily,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 40.sp,
+                        color = OnSurface
+                    )
+                    Text(
+                        text = if (TimerState.isRunning && !TimerState.isPaused) "RUNNING" else if (TimerState.isPaused) "PAUSED" else "READY",
+                        fontFamily = ManropeFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = if (TimerState.isRunning && !TimerState.isPaused) Primary else Outline,
+                        letterSpacing = 1.sp
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Task Name Input
+        OutlinedTextField(
+            value = TimerState.currentTaskName,
+            onValueChange = { TimerState.currentTaskName = it },
+            label = { Text("What are you working on?", fontFamily = ManropeFontFamily) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Primary,
+                focusedLabelColor = Primary,
+                unfocusedBorderColor = Outline.copy(alpha = 0.5f)
+            ),
+            shape = RoundedCornerShape(16.dp),
+            enabled = !TimerState.isRunning // Lock name while running to avoid edit confusion
+        )
+
+        // Project Dropdown Selector
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = TimerState.currentProject,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Project", fontFamily = ManropeFontFamily) },
+                trailingIcon = {
+                    IconButton(onClick = { if (!TimerState.isRunning) isProjectDropdownExpanded = true }) {
+                        Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null, tint = Primary)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().clickable { if (!TimerState.isRunning) isProjectDropdownExpanded = true },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Primary,
+                    focusedLabelColor = Primary,
+                    unfocusedBorderColor = Outline.copy(alpha = 0.5f)
+                ),
+                shape = RoundedCornerShape(16.dp),
+                enabled = !TimerState.isRunning
+            )
+
+            DropdownMenu(
+                expanded = isProjectDropdownExpanded,
+                onDismissRequest = { isProjectDropdownExpanded = false },
+                modifier = Modifier.fillMaxWidth(0.85f).background(WarmBackground)
+            ) {
+                projectList.forEach { proj ->
+                    DropdownMenuItem(
+                        text = { Text(proj, fontFamily = ManropeFontFamily) },
+                        onClick = {
+                            TimerState.currentProject = proj
+                            isProjectDropdownExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Timer Controls
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (!TimerState.isRunning) {
+                // START Button
+                Button(
+                    onClick = {
+                        TimerState.isRunning = true
+                        TimerState.isPaused = false
+                        TimerState.secondsElapsed = 0
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryContainer),
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.fillMaxWidth().height(56.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, tint = OnPrimaryFixed)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Start Timer", fontFamily = ManropeFontFamily, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = OnPrimaryFixed)
+                }
+            } else {
+                // PAUSE / RESUME Button
+                Button(
+                    onClick = { TimerState.isPaused = !TimerState.isPaused },
+                    colors = ButtonDefaults.buttonColors(containerColor = SecondaryContainer),
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.weight(1f).height(56.dp)
+                ) {
+                    Icon(
+                        imageVector = if (TimerState.isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                        contentDescription = null,
+                        tint = OnSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (TimerState.isPaused) "Resume" else "Pause",
+                        fontFamily = ManropeFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = OnSecondaryContainer
+                    )
+                }
+
+                // STOP & SAVE Button
+                Button(
+                    onClick = {
+                        val durationMins = (TimerState.secondsElapsed / 60).coerceAtLeast(1).toInt()
+                        val taskName = TimerState.currentTaskName.trim().ifEmpty { "Active Session" }
+                        val projectSelected = TimerState.currentProject
+                        
+                        // Infer category
+                        val category = when {
+                            taskName.contains("mail", true) || taskName.contains("admin", true) || taskName.contains("sync", true) -> "Admin"
+                            taskName.contains("break", true) || taskName.contains("coffee", true) || taskName.contains("relax", true) -> "Leisure"
+                            taskName.contains("health", true) || taskName.contains("run", true) || taskName.contains("gym", true) -> "Health"
+                            else -> "Focus"
+                        }
+
+                        val currentMillis = System.currentTimeMillis()
+                        val sdf = SimpleDateFormat("hh:mm AM", Locale.getDefault())
+                        // Subtract elapsed seconds to estimate correct start time
+                        val startCal = Calendar.getInstance().apply {
+                            timeInMillis = currentMillis - (TimerState.secondsElapsed * 1000)
+                        }
+                        val startTime = sdf.format(startCal.time)
+
+                        val result = dbHelper.addActivity(
+                            name = taskName,
+                            project = projectSelected,
+                            category = category,
+                            duration = durationMins,
+                            notes = "Logged via Timer",
+                            date = currentMillis,
+                            time = startTime
+                        )
+
+                        if (result != -1L) {
+                            Toast.makeText(context, "Session saved: ${durationMins}m", Toast.LENGTH_SHORT).show()
+                            // Reset state
+                            TimerState.isRunning = false
+                            TimerState.isPaused = false
+                            TimerState.secondsElapsed = 0
+                            onSaved()
+                        } else {
+                            Toast.makeText(context, "Failed to save session", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryContainer),
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.weight(1f).height(56.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Stop, contentDescription = null, tint = OnPrimaryFixed)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Stop & Save", fontFamily = ManropeFontFamily, fontWeight = FontWeight.Bold, color = OnPrimaryFixed)
+                }
+            }
+        }
+    }
+}
+
+// REPORTS TAB CONTENT
+@Composable
+fun ReportsTabContent(dbHelper: DatabaseHelper) {
+    var period by remember { mutableStateOf("Weekly") }
+    var allActivities by remember { mutableStateOf<List<ActivityRecord>>(emptyList()) }
+    LaunchedEffect(period) {
+        allActivities = dbHelper.getAllActivities()
+    }
+    
+    val filteredActivities = remember(period, allActivities) {
+        val calendar = Calendar.getInstance()
+        val now = calendar.timeInMillis
+        when (period) {
+            "Daily" -> allActivities.filter { isSameDay(it.dateMillis, now) }
+            "Weekly" -> {
+                val weekAgo = now - (7 * 24 * 60 * 60 * 1000L)
+                allActivities.filter { it.dateMillis in weekAgo..now }
+            }
+            "Monthly" -> {
+                val monthAgo = now - (30 * 24 * 60 * 60 * 1000L)
+                allActivities.filter { it.dateMillis in monthAgo..now }
+            }
+            else -> allActivities
+        }
+    }
+
+    val totalMinutes = filteredActivities.sumOf { it.duration }
+
+    val categoryData = remember(filteredActivities, totalMinutes) {
+        filteredActivities.groupBy { it.category }
+            .map { (category, activities) ->
+                val catMinutes = activities.sumOf { it.duration }
+                val percentage = if (totalMinutes > 0) (catMinutes * 100 / totalMinutes) else 0
+                val icon = when(category) {
+                    "Focus" -> Icons.Default.Psychology
+                    "Admin" -> Icons.Default.Email
+                    "Leisure" -> Icons.Default.LocalCafe
+                    "Health" -> Icons.Default.DirectionsRun
+                    else -> Icons.Default.Timer
+                }
+                CategoryReport(category, "${catMinutes / 60}h ${catMinutes % 60}m", percentage, icon)
+            }.sortedByDescending { it.percentage }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "Reports",
+            fontFamily = ManropeFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 24.sp,
+            color = OnSurface
+        )
+
+        // Period Toggle Button Row
+        Row(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(SurfaceContainer),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            listOf("Daily", "Weekly", "Monthly").forEach { opt ->
+                val isSelected = period == opt
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(if (isSelected) PrimaryContainer else Color.Transparent)
+                        .clickable { period = opt },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = opt,
+                        fontFamily = ManropeFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = if (isSelected) OnPrimaryFixed else OnSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        // Summary Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = SurfaceContainerLowest)
+        ) {
+            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "TOTAL TIME LOGGED",
+                    fontFamily = ManropeFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = Outline,
+                    letterSpacing = 0.5.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "${totalMinutes / 60}h ${totalMinutes % 60}m",
+                    fontFamily = ManropeFontFamily,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 36.sp,
+                    color = OnSurface
+                )
+            }
+        }
+
+        // Category breakdown progress list
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (categoryData.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No data to report.", fontFamily = ManropeFontFamily, color = Outline)
+                    }
+                }
+            } else {
+                items(categoryData) { cat ->
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(imageVector = cat.icon, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
+                                Text(cat.name, fontFamily = ManropeFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            }
+                            Text("${cat.percentage}% (${cat.time})", fontFamily = ManropeFontFamily, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Primary)
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)).background(SurfaceContainer)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(cat.percentage / 100f)
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(50))
+                                    .background(PrimaryContainer)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+data class CategoryReport(val name: String, val time: String, val percentage: Int, val icon: ImageVector)
+
+// SETTINGS TAB CONTENT
+@Composable
+fun SettingsTabContent(navController: NavController) {
+    val context = LocalContext.current
+    val sharedPref = remember { context.getSharedPreferences("UserSession", Context.MODE_PRIVATE) }
+    
+    val username = sharedPref.getString("username", "User") ?: "User"
+    val email = sharedPref.getString("email", "user@example.com") ?: "user@example.com"
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        Text(
+            text = "Settings",
+            fontFamily = ManropeFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 24.sp,
+            color = OnSurface
+        )
+
+        // Profile Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = SurfaceContainerLowest),
+            shape = RoundedCornerShape(24.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier.size(64.dp).clip(CircleShape).background(PrimaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = username.take(1).uppercase(),
+                        fontFamily = ManropeFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
+                        color = OnPrimaryFixed
+                    )
+                }
+
+                Column {
+                    Text(
+                        text = username,
+                        fontFamily = ManropeFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = OnSurface
+                    )
+                    Text(
+                        text = email,
+                        fontFamily = ManropeFontFamily,
+                        color = Outline,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        }
+
+        // Settings items
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsItem(icon = Icons.Outlined.Notifications, title = "Notification Settings")
+            
+            // Dark Mode Item with Switch
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = SurfaceContainerLowest),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(imageVector = Icons.Outlined.DarkMode, contentDescription = null, tint = Primary, modifier = Modifier.size(22.dp))
+                        Text("Dark Mode", fontFamily = ManropeFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OnSurface)
+                    }
+                    Switch(
+                        checked = ThemeState.isDarkMode,
+                        onCheckedChange = { isChecked ->
+                            ThemeState.isDarkMode = isChecked
+                            sharedPref.edit().putBoolean("isDarkMode", isChecked).apply()
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Primary,
+                            checkedTrackColor = PrimaryContainer
+                        )
+                    )
+                }
+            }
+            
+            SettingsItem(
+                icon = Icons.Outlined.PrivacyTip,
+                title = "Privacy Policy",
+                onClick = { navController.navigate("privacy_policy") }
+            )
+            SettingsItem(icon = Icons.Outlined.Info, title = "App Version 2.5.0")
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Logout Button
+        Button(
+            onClick = {
+                sharedPref.edit().putBoolean("isLoggedIn", false).apply()
+                // Reset active timer if running
+                TimerState.isRunning = false
+                TimerState.secondsElapsed = 0
+                
+                navController.navigate("login") {
+                    popUpTo("dashboard") { inclusive = true }
+                }
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = ErrorContainer),
+            shape = RoundedCornerShape(50),
+            modifier = Modifier.fillMaxWidth().height(56.dp)
+        ) {
+            Icon(imageVector = Icons.Default.Logout, contentDescription = null, tint = OnErrorContainer)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Logout", fontFamily = ManropeFontFamily, fontWeight = FontWeight.Bold, color = OnErrorContainer, fontSize = 16.sp)
+        }
+    }
+}
 
 @Composable
-fun AddFab() {
+fun SettingsItem(icon: ImageVector, title: String, onClick: () -> Unit = {}) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = SurfaceContainerLowest),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(imageVector = icon, contentDescription = null, tint = Primary, modifier = Modifier.size(22.dp))
+                Text(title, fontFamily = ManropeFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OnSurface)
+            }
+            Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = Outline)
+        }
+    }
+}
+
+// FLOATING ACTION BUTTON
+@Composable
+fun AddFab(onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(64.dp)
@@ -587,7 +1373,7 @@ fun AddFab() {
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = {}
+                onClick = onClick
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -600,8 +1386,7 @@ fun AddFab() {
     }
 }
 
-// BOTTOM NAVIGATION BAR
-
+// BOTTOM NAVIGATION
 @Composable
 fun MomentumBottomNav(
     selectedIndex: Int,
@@ -613,7 +1398,7 @@ fun MomentumBottomNav(
         NavItem("History", Icons.Outlined.CalendarMonth, Icons.Filled.CalendarMonth),
         NavItem("Start", Icons.Filled.PlayArrow, Icons.Filled.PlayArrow),
         NavItem("Reports", Icons.Outlined.BarChart, Icons.Filled.BarChart),
-        NavItem("Settings", Icons.Outlined.Settings, Icons.Filled.Settings),
+        NavItem("Setting", Icons.Outlined.Settings, Icons.Filled.Settings),
     )
 
     Box(
@@ -625,6 +1410,7 @@ fun MomentumBottomNav(
             )
             .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
             .background(WarmBackground.copy(alpha = 0.95f))
+            .navigationBarsPadding()
             .padding(
                 start = 16.dp,
                 end = 16.dp,
@@ -632,8 +1418,7 @@ fun MomentumBottomNav(
                 bottom = 24.dp,
             )
     ) {
-        // Top border line
-        Divider(
+        HorizontalDivider(
             color = CardBorder,
             thickness = 1.dp,
             modifier = Modifier
@@ -645,82 +1430,84 @@ fun MomentumBottomNav(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.Bottom,
         ) {
             navItems.forEachIndexed { index, item ->
-                if (index == 2) {
-                    // Center START button (elevated)
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.offset(y = (-16).dp)
-                    ) {
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    if (index == 2) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.offset(y = (-16).dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .shadow(
+                                        elevation = 4.dp,
+                                        shape = CircleShape,
+                                        spotColor = Color(0x33FFD541),
+                                    )
+                                    .clip(CircleShape)
+                                    .background(PrimaryContainer)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                    ) { onItemSelected(index) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.PlayArrow,
+                                    contentDescription = "Start",
+                                    tint = OnPrimaryFixed,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "START",
+                                fontFamily = ManropeFontFamily,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 8.sp,
+                                letterSpacing = 0.8.sp,
+                                color = if (selectedIndex == index) OnSurface else OnSurfaceVariant.copy(alpha = 0.5f),
+                            )
+                        }
+                    } else {
+                        val isSelected = selectedIndex == index
                         Box(
                             modifier = Modifier
-                                .size(48.dp)
-                                .shadow(
-                                    elevation = 4.dp,
-                                    shape = CircleShape,
-                                    spotColor = Color(0x33FFD541),
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    if (isSelected) SurfaceContainerLowest.copy(alpha = 0.5f)
+                                    else Color.Transparent
                                 )
-                                .clip(CircleShape)
-                                .background(PrimaryContainer)
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
-                                ) { onItemSelected(index) },
+                                ) { onItemSelected(index) }
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.PlayArrow,
-                                contentDescription = "Start",
-                                tint = OnPrimaryFixed,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "START",
-                            fontFamily = ManropeFontFamily,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 10.sp,
-                            letterSpacing = 0.8.sp,
-                            color = if (selectedIndex == index) OnSurface else OnSurfaceVariant.copy(alpha = 0.5f),
-                        )
-                    }
-                } else {
-                    // Regular nav item
-                    val isSelected = selectedIndex == index
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                if (isSelected) SurfaceContainerLowest.copy(alpha = 0.5f)
-                                else Color.Transparent
-                            )
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { onItemSelected(index) }
-                            .padding(horizontal = 12.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = if (isSelected) item.selectedIcon else item.icon,
-                                contentDescription = item.label,
-                                tint = if (isSelected) OnSurface else OnSurfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = item.label.uppercase(),
-                                fontFamily = ManropeFontFamily,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 10.sp,
-                                letterSpacing = 0.8.sp,
-                                color = if (isSelected) OnSurface else OnSurfaceVariant.copy(alpha = 0.5f),
-                            )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = if (isSelected) item.selectedIcon else item.icon,
+                                    contentDescription = item.label,
+                                    tint = if (isSelected) OnSurface else OnSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = item.label.uppercase(),
+                                    fontFamily = ManropeFontFamily,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 8.sp,
+                                    letterSpacing = 0.8.sp,
+                                    color = if (isSelected) OnSurface else OnSurfaceVariant.copy(alpha = 0.5f),
+                                )
+                            }
                         }
                     }
                 }
@@ -729,12 +1516,17 @@ fun MomentumBottomNav(
     }
 }
 
-// PREVIEW
+// HELPER FUNCTIONS
+private fun formatElapsedTime(seconds: Long): String {
+    val h = seconds / 3600
+    val m = (seconds % 3600) / 60
+    val s = seconds % 60
+    return String.format(Locale.getDefault(), "%02d:%02d:%02d", h, m, s)
+}
 
-@Preview(showBackground = true, showSystemUi = true)
-@Composable
-fun HomeScreenPreview() {
-    com.example.timetracker.ui.theme.TimetrackerTheme {
-        HomeScreen()
-    }
+private fun isSameDay(t1: Long, t2: Long): Boolean {
+    val cal1 = Calendar.getInstance().apply { timeInMillis = t1 }
+    val cal2 = Calendar.getInstance().apply { timeInMillis = t2 }
+    return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+           cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
 }

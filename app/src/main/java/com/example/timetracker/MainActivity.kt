@@ -1,60 +1,48 @@
 package com.example.timetracker
 
+import android.content.Context
 import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.fragment.app.Fragment
-import com.google.android.material.bottomnavigation.BottomNavigationView
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.timetracker.ui.screens.*
+import com.example.timetracker.ui.theme.ThemeState
+import com.example.timetracker.ui.theme.TimetrackerTheme
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContentView(R.layout.activity_main)
-        
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, 0) // Bottom padding handled by nav bar
-            insets
-        }
 
-        val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
-        
-        // Set indicator color programmatically to avoid XML attribute not found error
-        bottomNavigation.itemActiveIndicatorColor = getColorStateList(R.color.nav_indicator_gray)
-        
-        bottomNavigation.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> {
-                    loadFragment(HomeFragment())
-                    true
+        // Load dark mode setting
+        val sharedPref = getSharedPreferences("UserSession", Context.MODE_PRIVATE)
+        ThemeState.isDarkMode = sharedPref.getBoolean("isDarkMode", false)
+
+        setContent {
+            TimetrackerTheme(darkTheme = ThemeState.isDarkMode) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    val navController = rememberNavController()
+                    NavHost(navController = navController, startDestination = "splash") {
+                        composable("splash") { SplashScreen(navController) }
+                        composable("onboarding") { OnboardingScreen(navController) }
+                        composable("login") { LoginScreen(navController) }
+                        composable("register") { RegisterScreen(navController) }
+                        composable("dashboard") { HomeScreen(navController) }
+                        composable("add_edit") { AddEditScreen(navController) }
+                        composable("privacy_policy") { PrivacyPolicyScreen(navController) }
+                    }
                 }
-                R.id.nav_history -> {
-                    loadFragment(HistoryFragment())
-                    true
-                }
-                R.id.nav_play -> {
-                    loadFragment(PlayFragment())
-                    true
-                }
-                R.id.nav_reports -> {
-                    loadFragment(ReportsFragment())
-                    true
-                }
-                R.id.nav_settings -> {
-                    loadFragment(SettingsFragment())
-                    true
-                }
-                else -> false
             }
         }
-    }
-
-    private fun loadFragment(fragment: Fragment) {
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, fragment)
-            .commit()
     }
 }

@@ -11,8 +11,7 @@
     <!-- Settings -->
     <string name="settings_notifications">Notification Settings</string>
     <string name="settings_dark_mode">Dark Mode</string>
-    <string name="settings_time_target">Daily Time Target</string>
-    <string name="settings_time_target_sub">Currently: 6h 30m</string>
+
     <string name="settings_privacy">Privacy Policy</string>
     <string name="settings_support">Support &amp; Feedback</string>
     <string name="settings_logout">Logout</string>

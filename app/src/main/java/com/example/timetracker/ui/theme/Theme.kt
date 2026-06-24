@@ -1,8 +1,49 @@
 package com.example.timetracker.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+
+// Global state for Dark Mode
+object ThemeState {
+    var isDarkMode by mutableStateOf(false)
+}
+
+private val DarkColorScheme = darkColorScheme(
+    primary = Color(0xFFEBC32E), // InversePrimary (Warm gold)
+    onPrimary = Color(0xFF3B2F00),
+    primaryContainer = Color(0xFF554500),
+    onPrimaryContainer = Color(0xFFFFE07D),
+    secondary = Color(0xFFCBC6BA),
+    onSecondary = Color(0xFF32302A),
+    secondaryContainer = Color(0xFF494740),
+    onSecondaryContainer = Color(0xFFE6E2D9),
+    tertiary = Color(0xFF80F4FF),
+    onTertiary = Color(0xFF00363B),
+    tertiaryContainer = Color(0xFF004F55),
+    onTertiaryContainer = Color(0xFF80F4FF),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6),
+    background = Color(0xFF1B1A17), // Dark Warm background
+    onBackground = Color(0xFFEAE2D5),
+    surface = Color(0xFF1B1A17),
+    onSurface = Color(0xFFEAE2D5),
+    surfaceVariant = Color(0xFF4D4634),
+    onSurfaceVariant = Color(0xFFD0C6AD),
+    outline = Color(0xFF99907C),
+    outlineVariant = Color(0xFF4D4634),
+    inverseSurface = Color(0xFFEAE2D5),
+    inverseOnSurface = Color(0xFF303031),
+    inversePrimary = Primary,
+)
 
 private val LightColorScheme = lightColorScheme(
     primary = Primary,
@@ -35,9 +76,14 @@ private val LightColorScheme = lightColorScheme(
 )
 
 @Composable
-fun TimetrackerTheme(content: @Composable () -> Unit) {
+fun TimetrackerTheme(
+    darkTheme: Boolean = ThemeState.isDarkMode,
+    content: @Composable () -> Unit
+) {
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+
     MaterialTheme(
-        colorScheme = LightColorScheme,
+        colorScheme = colorScheme,
         typography = AppTypography,
         content = content,
     )
