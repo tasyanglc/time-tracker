@@ -1,5 +1,6 @@
-        package com.example.timetracker
+package com.example.timetracker
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -13,9 +14,18 @@ class SplashActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_splash)
         
-        // Menunggu selama 3 detik sebelum pindah ke OnboardingActivity
         Handler(Looper.getMainLooper()).postDelayed({
-            startActivity(Intent(this, OnboardingActivity::class.java))
+            val sharedPref = getSharedPreferences("UserSession", Context.MODE_PRIVATE)
+            val isLoggedIn = sharedPref.getBoolean("isLoggedIn", false)
+            val isFirstRun = sharedPref.getBoolean("isFirstRun", true)
+
+            if (isLoggedIn) {
+                startActivity(Intent(this, MainActivity::class.java))
+            } else if (isFirstRun) {
+                startActivity(Intent(this, OnboardingActivity::class.java))
+            } else {
+                startActivity(Intent(this, LoginActivity::class.java))
+            }
             finish()
         }, 3000)
     }

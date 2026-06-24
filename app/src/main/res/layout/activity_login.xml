@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/main_login"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#FDFBF7">
@@ -7,39 +9,54 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_horizontal"
         android:orientation="vertical"
         android:padding="24dp">
 
-        <!-- Logo Section -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:gravity="center_horizontal"
-            android:orientation="vertical">
+        <!-- Header -->
 
-            <ImageView
-                android:id="@+id/logo"
-                android:layout_width="80dp"
-                android:layout_height="80dp"
-                android:contentDescription="@null"
-                android:src="@drawable/lucide__1_" />
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="42dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
                 android:text="Momentum"
                 android:textColor="#333333"
-                android:textSize="22sp"
+                android:textSize="16sp"
                 android:textStyle="bold" />
-        </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/btn_to_register"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Sign Up "
+                    android:textColor="#B89450"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_chevronright"
+                    app:tint="#B89450" />
+            </LinearLayout>
+        </RelativeLayout>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="64dp"
             android:gravity="center"
             android:text="Welcome back"
             android:textColor="#000000"
@@ -51,130 +68,75 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:gravity="center"
-            android:text="Effortless time tracking awaits."
+            android:text="Pick up where you left off and keep moving."
             android:textColor="#666666"
             android:textSize="16sp" />
 
-        <!-- Login Form Card -->
+        <!-- Form  -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
             android:background="@drawable/bg_card_rounded"
-            android:elevation="0dp"
             android:orientation="vertical"
             android:padding="24dp">
 
-            <!-- Email -->
+            <!-- Username/Email -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:text="Email Address"
+                android:text="Username or Email"
                 android:textColor="#444444"
                 android:textStyle="bold" />
 
             <EditText
-                android:id="@+id/log_et_email"
+                android:id="@+id/login_et_identity"
                 android:layout_width="match_parent"
                 android:layout_height="55dp"
-                android:layout_marginBottom="20dp"
+                android:layout_marginBottom="16dp"
                 android:background="@drawable/bg_card_rounded"
-                android:hint="name@example.com"
+                android:hint="jennie / name@example.com"
                 android:importantForAutofill="no"
-                android:inputType="textEmailAddress"
                 android:paddingStart="16dp"
-                android:paddingEnd="16dp"
                 android:textColor="#000000"
                 android:textColorHint="#757575"
                 android:textSize="14sp" />
 
-            <!-- Password Header (Label + Forgot Password) -->
-            <RelativeLayout
-                android:layout_width="match_parent"
+            <!-- Password -->
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Password"
-                    android:textColor="#000000"
-                    android:textColorHint="#757575"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tv_forgot_password"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentEnd="true"
-                    android:text="Forgot Password?"
-                    android:textColor="#B89450"
-                    android:textSize="12sp"
-                    android:textStyle="bold" /> <!-- Warna emas sesuai desain -->
-            </RelativeLayout>
+                android:layout_marginBottom="8dp"
+                android:text="Password"
+                android:textColor="#444444"
+                android:textStyle="bold" />
 
             <EditText
-                android:id="@+id/log_et_password"
+                android:id="@+id/login_et_password"
                 android:layout_width="match_parent"
                 android:layout_height="55dp"
                 android:layout_marginBottom="24dp"
                 android:background="@drawable/bg_card_rounded"
-                android:drawablePadding="12dp"
                 android:hint="........"
                 android:importantForAutofill="no"
                 android:inputType="textPassword"
                 android:paddingStart="16dp"
-                android:paddingEnd="16dp"
                 android:textColor="#000000"
                 android:textColorHint="#757575"
                 android:textSize="14sp" />
 
-            <!-- Login Button -->
             <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/log_btn_login"
+                android:id="@+id/login_btn_signin"
                 android:layout_width="match_parent"
                 android:layout_height="55dp"
                 android:background="@drawable/bg_card_rounded"
                 android:backgroundTint="#FFD740"
-                android:text="Login"
+                android:text="Sign In"
                 android:textAllCaps="false"
                 android:textColor="#000000"
                 android:textStyle="bold" />
-
-            <!-- Separator OR -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginVertical="20dp"
-                android:gravity="center"
-                android:text="OR"
-                android:textColor="#CCCCCC"
-                android:textSize="12sp" />
-
-            <!-- Register Button  -->
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/log_btn_to_register"
-                android:layout_width="match_parent"
-                android:layout_height="55dp"
-                android:background="@drawable/bg_card_rounded"
-                android:backgroundTint="#EBE7E0"
-                android:text="Register"
-                android:textAllCaps="false"
-                android:textColor="#555555"
-                android:textStyle="bold" />
         </LinearLayout>
-
-        <!-- Footer -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="40dp"
-            android:gravity="center"
-            android:letterSpacing="0.1"
-            android:text="TRUSTED BY TEAMS AT"
-            android:textColor="#CCCCCC"
-            android:textSize="10sp" />
 
     </LinearLayout>
 </ScrollView>

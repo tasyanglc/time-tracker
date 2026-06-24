@@ -1,66 +1,67 @@
 package com.example.timetracker
 
-
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Button
 import android.widget.EditText
-import android.widget.TextView
+import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-
+import androidx.appcompat.widget.AppCompatButton
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 class LoginActivity : AppCompatActivity() {
 
+    private lateinit var dbHelper: DatabaseHelper
 
-   override fun onCreate(savedInstanceState: Bundle?) {
-       super.onCreate(savedInstanceState)
-       setContentView(R.layout.activity_login)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContentView(R.layout.activity_login)
 
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main_login)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
 
-       // 1. Inisialisasi komponen dari XML
-       val etEmail = findViewById<EditText>(R.id.log_et_email)
-       val etPassword = findViewById<EditText>(R.id.log_et_password)
-       val btnLogin = findViewById<Button>(R.id.log_btn_login)
-       val btnToRegister = findViewById<Button>(R.id.log_btn_to_register)
-       val tvForgotPassword = findViewById<TextView>(R.id.tv_forgot_password)
+        dbHelper = DatabaseHelper(this)
 
+        val etIdentity = findViewById<EditText>(R.id.login_et_identity)
+        val etPassword = findViewById<EditText>(R.id.login_et_password)
+        val btnSignIn = findViewById<AppCompatButton>(R.id.login_btn_signin)
+        val btnToRegister = findViewById<LinearLayout>(R.id.btn_to_register)
 
-       // Logika klik tombol Login
-       btnLogin.setOnClickListener {
-           val email = etEmail.text.toString()
-           val password = etPassword.text.toString()
+        btnToRegister.setOnClickListener {
+            startActivity(Intent(this, RegisterActivity::class.java))
+            finish()
+        }
 
+        btnSignIn.setOnClickListener {
+            val identity = etIdentity.text.toString().trim()
+            val password = etPassword.text.toString().trim()
 
-           // Validasi simpel: email & password tidak boleh kosong
-           if (email.isNotEmpty() && password.isNotEmpty()) {
-               Toast.makeText(this, "Login Successful!", Toast.LENGTH_SHORT).show()
+            if (identity.isEmpty() || password.isEmpty()) {
+                Toast.makeText(this, "Username/Email dan Password wajib diisi", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
 
+            if (dbHelper.checkUser(identity, password)) {
+                val sharedPref = getSharedPreferences("UserSession", Context.MODE_PRIVATE)
+                with(sharedPref.edit()) {
+                    putBoolean("isLoggedIn", true)
+                    putString("username", identity)
+                    apply()
+                }
 
-               // Pindah ke halaman Home (MainActivity)
-               val intent = Intent(this, MainActivity::class.java)
-               startActivity(intent)
-               finish() // Agar tidak bisa 'back' ke halaman login lagi
-           } else {
-               Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
-           }
-       }
-
-
-       // Logika klik tombol Register (Pindah ke RegisterActivity)
-       btnToRegister.setOnClickListener {
-           val intent = Intent(this, RegisterActivity::class.java)
-           startActivity(intent)
-       }
-
-
-       // Logika klik Forgot Password
-       tvForgotPassword.setOnClickListener {
-           Toast.makeText(this, "Forgot Password clicked! Coming soon.", Toast.LENGTH_SHORT).show()
-
-
-
-
-       }
-   }
+                Toast.makeText(this, "Login berhasil", Toast.LENGTH_SHORT).show()
+                startActivity(Intent(this, MainActivity::class.java))
+                finish()
+            } else {
+                Toast.makeText(this, "Username/Email atau Password salah", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 }
