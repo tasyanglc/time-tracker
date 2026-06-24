@@ -49,10 +49,12 @@ class LoginActivity : AppCompatActivity() {
             }
 
             if (dbHelper.checkUser(identity, password)) {
+                val userDetails = dbHelper.getUserDetails(identity)
                 val sharedPref = getSharedPreferences("UserSession", Context.MODE_PRIVATE)
                 with(sharedPref.edit()) {
                     putBoolean("isLoggedIn", true)
-                    putString("username", identity)
+                    putString("username", userDetails?.get("username") ?: identity)
+                    putString("email", userDetails?.get("email") ?: "")
                     apply()
                 }
 

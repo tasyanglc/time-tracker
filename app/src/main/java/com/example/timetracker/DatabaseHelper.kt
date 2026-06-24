@@ -71,4 +71,23 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         db.close()
         return exists
     }
+
+    fun getUserDetails(usernameOrEmail: String): Map<String, String>? {
+        val db = this.readableDatabase
+        val cursor = db.rawQuery(
+            "SELECT $COLUMN_USERNAME, $COLUMN_EMAIL FROM $TABLE_NAME WHERE $COLUMN_USERNAME = ? OR $COLUMN_EMAIL = ?",
+            arrayOf(usernameOrEmail, usernameOrEmail)
+        )
+        
+        var userDetails: Map<String, String>? = null
+        if (cursor.moveToFirst()) {
+            userDetails = mapOf(
+                "username" to cursor.getString(0),
+                "email" to cursor.getString(1)
+            )
+        }
+        cursor.close()
+        db.close()
+        return userDetails
+    }
 }

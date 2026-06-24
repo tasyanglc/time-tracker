@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.TextView
 import androidx.fragment.app.Fragment
 
 class SettingsFragment : Fragment() {
@@ -16,8 +17,14 @@ class SettingsFragment : Fragment() {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_settings, container, false)
 
+        val sharedPref = requireActivity().getSharedPreferences("UserSession", Context.MODE_PRIVATE)
+        val username = sharedPref.getString("username", "User")
+        val email = sharedPref.getString("email", "user@example.com")
+
+        view.findViewById<TextView>(R.id.tvProfileName).text = username
+        view.findViewById<TextView>(R.id.tvProfileEmail).text = email
+
         view.findViewById<Button>(R.id.btnLogout).setOnClickListener {
-            val sharedPref = requireActivity().getSharedPreferences("UserSession", Context.MODE_PRIVATE)
             with(sharedPref.edit()) {
                 putBoolean("isLoggedIn", false)
                 apply()
