@@ -43,6 +43,10 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import kotlinx.coroutines.delay
+import com.example.timetracker.SupabaseManager
+import com.example.timetracker.ActivityRecordDto
+import io.github.jan.supabase.gotrue.auth
+import kotlinx.coroutines.launch
 
 // DATA CLASSES
 data class ActivityItem(
@@ -73,7 +77,8 @@ object TimerState {
 @Composable
 fun HomeScreen(navController: NavController) {
     val context = LocalContext.current
-    val dbHelper = remember { DatabaseHelper(context) }
+    val sharedPref = remember { context.getSharedPreferences("UserSession", Context.MODE_PRIVATE) }
+    val userId = sharedPref.getString("userId", "") ?: ""
     
     val scrollState = rememberScrollState()
     var selectedNavItem by rememberSaveable { mutableIntStateOf(0) }
@@ -124,16 +129,16 @@ fun HomeScreen(navController: NavController) {
                         .padding(horizontal = 20.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
-                    TodaySummaryCard(dbHelper, refreshTrigger)
+                    TodaySummaryCard(userId, refreshTrigger)
                     ActiveTimerWidget(onTimerAction = { selectedNavItem = 2 })
-                    RecentActivitiesSection(dbHelper, refreshTrigger)
+                    RecentActivitiesSection(userId, refreshTrigger)
                 }
-                1 -> HistoryTabContent(dbHelper)
-                2 -> PlayTabContent(dbHelper, onSaved = {
+                1 -> HistoryTabContent(userId)
+                2 -> PlayTabContent(userId, onSaved = {
                     refreshTrigger++
                     selectedNavItem = 0
                 })
-                3 -> ReportsTabContent(dbHelper)
+                3 -> ReportsTabContent(userId)
                 4 -> SettingsTabContent(navController)
             }
         }
@@ -192,11 +197,11 @@ fun MomentumTopBar(title: String, modifier: Modifier = Modifier) {
 
 // TODAY'S SUMMARY CARD
 @Composable
-fun TodaySummaryCard(dbHelper: DatabaseHelper, refreshTrigger: Int) {
+fun TodaySummaryCard(userId: String, refreshTrigger: Int) {
     var todayRecords by remember { mutableStateOf<List<ActivityRecord>>(emptyList()) }
     
     LaunchedEffect(refreshTrigger) {
-        todayRecords = dbHelper.getActivitiesByDate(System.currentTimeMillis())
+        todayRecords = SupabaseManager.getActivitiesByDate(userId, System.currentTimeMillis())
     }
     
     val totalMinutes = todayRecords.sumOf { it.duration }
@@ -453,11 +458,11 @@ fun TimerControlButton(
 
 // RECENT ACTIVITIES SECTION
 @Composable
-fun RecentActivitiesSection(dbHelper: DatabaseHelper, refreshTrigger: Int) {
+fun RecentActivitiesSection(userId: String, refreshTrigger: Int) {
     var records by remember { mutableStateOf<List<ActivityRecord>>(emptyList()) }
     
     LaunchedEffect(refreshTrigger) {
-        records = dbHelper.getAllActivities().takeLast(3).reversed()
+        records = SupabaseManager.getAllActivities(userId).takeLast(3).reversed()
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -605,7 +610,7 @@ fun ActivityCard(activity: ActivityItem) {
 
 // HISTORY TAB CONTENT
 @Composable
-fun HistoryTabContent(dbHelper: DatabaseHelper) {
+fun HistoryTabContent(userId: String) {
     val calendar = remember { Calendar.getInstance() }
     var selectedDate by remember { mutableStateOf(calendar.timeInMillis) }
     
@@ -632,7 +637,7 @@ fun HistoryTabContent(dbHelper: DatabaseHelper) {
 
     var records by remember { mutableStateOf<List<ActivityRecord>>(emptyList()) }
     LaunchedEffect(selectedDate) {
-        records = dbHelper.getActivitiesByDate(selectedDate)
+        records = SupabaseManager.getActivitiesByDate(userId, selectedDate)
     }
     val totalTime = records.sumOf { it.duration }
 
@@ -806,12 +811,129 @@ fun HistoryTabContent(dbHelper: DatabaseHelper) {
 
 // PLAY / START TIMER TAB CONTENT
 @Composable
-fun PlayTabContent(dbHelper: DatabaseHelper, onSaved: () -> Unit) {
+fun PlayTabContent(userId: String, onSaved: () -> Unit) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var isProjectDropdownExpanded by remember { mutableStateOf(false) }
-    val projectList = listOf("Work", "Education", "Personal", "Health", "Hobby", "Finance", "Social")
+    
+    var projectList by remember { mutableStateOf<List<String>>(emptyList()) }
+    var refreshProjectTrigger by remember { mutableStateOf(0) }
+    var showAddProjectDialog by remember { mutableStateOf(false) }
+    var newProjectName by remember { mutableStateOf("") }
+    var projectToDelete by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(refreshProjectTrigger) {
+        projectList = SupabaseManager.getAllProjects()
+        if (TimerState.currentProject.isEmpty() && projectList.isNotEmpty()) {
+            TimerState.currentProject = projectList.first()
+        }
+    }
 
     val timeString = formatElapsedTime(TimerState.secondsElapsed)
+
+    // AlertDialog for Adding New Project
+    if (showAddProjectDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showAddProjectDialog = false
+                newProjectName = ""
+            },
+            title = { Text("Add New Project", fontFamily = ManropeFontFamily, fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = newProjectName,
+                    onValueChange = { newProjectName = it },
+                    label = { Text("Project Name", fontFamily = ManropeFontFamily) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Primary,
+                        focusedLabelColor = Primary
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val trimmed = newProjectName.trim()
+                        if (trimmed.isNotEmpty()) {
+                            coroutineScope.launch {
+                                val res = SupabaseManager.addProject(trimmed)
+                                if (res) {
+                                    refreshProjectTrigger++
+                                    showAddProjectDialog = false
+                                    newProjectName = ""
+                                    Toast.makeText(context, "Project added successfully", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Project already exists or error occurred", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } else {
+                            Toast.makeText(context, "Name cannot be empty", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                ) {
+                    Text("Add", color = Color.White)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        showAddProjectDialog = false
+                        newProjectName = ""
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Outline)
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // AlertDialog for Confirming Project Deletion
+    projectToDelete?.let { proj ->
+        AlertDialog(
+            onDismissRequest = { projectToDelete = null },
+            title = { Text("Delete Project", fontFamily = ManropeFontFamily, fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to delete the project \"$proj\"?", fontFamily = ManropeFontFamily) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            val deleted = SupabaseManager.deleteProject(proj)
+                            if (deleted) {
+                                refreshProjectTrigger++
+                                if (TimerState.currentProject == proj) {
+                                    TimerState.currentProject = if (projectList.size > 1) {
+                                        projectList.filter { it != proj }.first()
+                                    } else {
+                                        ""
+                                    }
+                                }
+                                Toast.makeText(context, "Project deleted", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Failed to delete project", Toast.LENGTH_SHORT).show()
+                            }
+                            projectToDelete = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorContainer)
+                ) {
+                    Text("Delete", color = OnErrorContainer)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { projectToDelete = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Outline)
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -905,9 +1027,48 @@ fun PlayTabContent(dbHelper: DatabaseHelper, onSaved: () -> Unit) {
                         onClick = {
                             TimerState.currentProject = proj
                             isProjectDropdownExpanded = false
+                        },
+                        trailingIcon = {
+                            IconButton(
+                                onClick = {
+                                    projectToDelete = proj
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Delete",
+                                    tint = Color.Red.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                     )
                 }
+
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                tint = Primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Add New Project",
+                                fontFamily = ManropeFontFamily,
+                                color = Primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    },
+                    onClick = {
+                        isProjectDropdownExpanded = false
+                        showAddProjectDialog = true
+                    }
+                )
             }
         }
 
@@ -979,27 +1140,32 @@ fun PlayTabContent(dbHelper: DatabaseHelper, onSaved: () -> Unit) {
                         }
                         val startTime = sdf.format(startCal.time)
 
-                        val result = dbHelper.addActivity(
-                            name = taskName,
-                            project = projectSelected,
-                            category = category,
-                            duration = durationMins,
-                            notes = "Logged via Timer",
-                            date = currentMillis,
-                            time = startTime
-                        )
+                        coroutineScope.launch {
+                            val success = SupabaseManager.addActivity(
+                                ActivityRecordDto(
+                                    user_id = userId,
+                                    activity_name = taskName,
+                                    project = projectSelected,
+                                    category = category,
+                                    duration = durationMins,
+                                    notes = "Logged via Timer",
+                                    date_millis = currentMillis,
+                                    start_time = startTime
+                                )
+                            )
 
-                        if (result != -1L) {
-                            Toast.makeText(context, "Session saved: ${durationMins}m", Toast.LENGTH_SHORT).show()
-                            // Reset state
-                            TimerState.isRunning = false
-                            TimerState.isPaused = false
-                            TimerState.secondsElapsed = 0
-                            TimerState.currentTaskName = ""
-                            TimerState.currentProject = ""
-                            onSaved()
-                        } else {
-                            Toast.makeText(context, "Failed to save session", Toast.LENGTH_SHORT).show()
+                            if (success) {
+                                Toast.makeText(context, "Session saved: ${durationMins}m", Toast.LENGTH_SHORT).show()
+                                // Reset state
+                                TimerState.isRunning = false
+                                TimerState.isPaused = false
+                                TimerState.secondsElapsed = 0
+                                TimerState.currentTaskName = ""
+                                TimerState.currentProject = ""
+                                onSaved()
+                            } else {
+                                Toast.makeText(context, "Failed to save session", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryContainer),
@@ -1017,11 +1183,11 @@ fun PlayTabContent(dbHelper: DatabaseHelper, onSaved: () -> Unit) {
 
 // REPORTS TAB CONTENT
 @Composable
-fun ReportsTabContent(dbHelper: DatabaseHelper) {
+fun ReportsTabContent(userId: String) {
     var period by remember { mutableStateOf("Weekly") }
     var allActivities by remember { mutableStateOf<List<ActivityRecord>>(emptyList()) }
     LaunchedEffect(period) {
-        allActivities = dbHelper.getAllActivities()
+        allActivities = SupabaseManager.getAllActivities(userId)
     }
     
     val filteredActivities = remember(period, allActivities) {
@@ -1174,6 +1340,7 @@ data class CategoryReport(val name: String, val time: String, val percentage: In
 @Composable
 fun SettingsTabContent(navController: NavController) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val sharedPref = remember { context.getSharedPreferences("UserSession", Context.MODE_PRIVATE) }
     
     val username = sharedPref.getString("username", "User") ?: "User"
@@ -1280,15 +1447,28 @@ fun SettingsTabContent(navController: NavController) {
         // Logout Button
         Button(
             onClick = {
-                sharedPref.edit().putBoolean("isLoggedIn", false).apply()
-                // Reset active timer if running
-                TimerState.isRunning = false
-                TimerState.secondsElapsed = 0
-                TimerState.currentTaskName = ""
-                TimerState.currentProject = ""
-                
-                navController.navigate("login") {
-                    popUpTo("dashboard") { inclusive = true }
+                coroutineScope.launch {
+                    try {
+                        SupabaseManager.client.auth.signOut()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                    sharedPref.edit().apply {
+                        putBoolean("isLoggedIn", false)
+                        putString("userId", "")
+                        putString("username", "")
+                        putString("email", "")
+                        apply()
+                    }
+                    // Reset active timer if running
+                    TimerState.isRunning = false
+                    TimerState.secondsElapsed = 0
+                    TimerState.currentTaskName = ""
+                    TimerState.currentProject = ""
+                    
+                    navController.navigate("login") {
+                        popUpTo("dashboard") { inclusive = true }
+                    }
                 }
             },
             colors = ButtonDefaults.buttonColors(containerColor = ErrorContainer),

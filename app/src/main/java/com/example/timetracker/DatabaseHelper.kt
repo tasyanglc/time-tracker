@@ -9,7 +9,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     companion object {
         private const val DATABASE_NAME = "app_login.db"
-        private const val DATABASE_VERSION = 2
+        private const val DATABASE_VERSION = 3
         const val TABLE_NAME = "users"
         const val COLUMN_ID = "id"
         const val COLUMN_USERNAME = "username"
@@ -25,6 +25,10 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         const val COLUMN_ACT_NOTES = "notes"
         const val COLUMN_ACT_DATE = "date_millis"
         const val COLUMN_ACT_TIME = "start_time"
+
+        const val TABLE_PROJECTS = "projects"
+        const val COLUMN_PROJ_ID = "proj_id"
+        const val COLUMN_PROJ_NAME = "project_name"
     }
 
     override fun onCreate(db: SQLiteDatabase?) {
@@ -37,12 +41,14 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
         if (db != null) {
             ensureActivitiesTableExists(db)
+            ensureProjectsTableExists(db)
         }
     }
 
     override fun onUpgrade(db: SQLiteDatabase?, oldVersion: Int, newVersion: Int) {
         if (db != null) {
             ensureActivitiesTableExists(db)
+            ensureProjectsTableExists(db)
         }
     }
 
@@ -225,6 +231,79 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         } catch (e: Exception) {
             e.printStackTrace()
             null
+        }
+    }
+
+    private fun ensureProjectsTableExists(db: SQLiteDatabase) {
+        try {
+            val createProjectsTable = ("CREATE TABLE IF NOT EXISTS " + TABLE_PROJECTS + " ("
+                    + COLUMN_PROJ_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    + COLUMN_PROJ_NAME + " TEXT UNIQUE)")
+            db.execSQL(createProjectsTable)
+            
+            val cursor = db.rawQuery("SELECT COUNT(*) FROM $TABLE_PROJECTS", null)
+            var count = 0
+            if (cursor.moveToFirst()) {
+                count = cursor.getInt(0)
+            }
+            cursor.close()
+            
+            if (count == 0) {
+                val defaults = listOf("Work", "Education", "Personal")
+                for (proj in defaults) {
+                    val values = ContentValues()
+                    values.put(COLUMN_PROJ_NAME, proj)
+                    db.insert(TABLE_PROJECTS, null, values)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun getAllProjects(): List<String> {
+        val list = mutableListOf<String>()
+        try {
+            val db = this.readableDatabase
+            ensureProjectsTableExists(db)
+            val cursor = db.rawQuery("SELECT $COLUMN_PROJ_NAME FROM $TABLE_PROJECTS", null)
+            if (cursor.moveToFirst()) {
+                do {
+                    list.add(cursor.getString(0))
+                } while (cursor.moveToNext())
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        if (list.isEmpty()) {
+            return listOf("Work", "Education", "Personal")
+        }
+        return list
+    }
+
+    fun addProject(name: String): Long {
+        return try {
+            val db = this.writableDatabase
+            ensureProjectsTableExists(db)
+            val values = ContentValues()
+            values.put(COLUMN_PROJ_NAME, name)
+            db.insert(TABLE_PROJECTS, null, values)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            -1L
+        }
+    }
+
+    fun deleteProject(name: String): Boolean {
+        return try {
+            val db = this.writableDatabase
+            ensureProjectsTableExists(db)
+            val rowsDeleted = db.delete(TABLE_PROJECTS, "$COLUMN_PROJ_NAME = ?", arrayOf(name))
+            rowsDeleted > 0
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
     }
 }

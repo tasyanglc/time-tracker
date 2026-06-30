@@ -44,6 +44,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.timetracker.DatabaseHelper
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import io.github.jan.supabase.gotrue.auth
+import io.github.jan.supabase.gotrue.providers.builtin.Email
+import com.example.timetracker.SupabaseManager
+import kotlinx.serialization.json.jsonPrimitive
 import com.example.timetracker.ui.theme.ManropeFontFamily
 import com.example.timetracker.ui.theme.OnPrimaryFixed
 import com.example.timetracker.ui.theme.OnSurface
@@ -57,6 +63,7 @@ import com.example.timetracker.ui.theme.WarmBackground
 fun LoginScreen(navController: NavController) {
     val context = LocalContext.current
     val dbHelper = remember { DatabaseHelper(context) }
+    val coroutineScope = rememberCoroutineScope()
 
     var identity by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -159,21 +166,36 @@ fun LoginScreen(navController: NavController) {
                         return@Button
                     }
 
-                    if (dbHelper.checkUser(trimIdentity, trimPassword)) {
-                        val userDetails = dbHelper.getUserDetails(trimIdentity)
-                        val sharedPref = context.getSharedPreferences("UserSession", Context.MODE_PRIVATE)
-                        sharedPref.edit().apply {
-                            putBoolean("isLoggedIn", true)
-                            putString("username", userDetails?.get("username") ?: trimIdentity)
-                            putString("email", userDetails?.get("email") ?: "")
-                            apply()
+                    coroutineScope.launch {
+                        try {
+                            SupabaseManager.client.auth.signInWith(Email) {
+                                this.email = trimIdentity
+                                this.password = trimPassword
+                            }
+                            val user = SupabaseManager.client.auth.currentUserOrNull()
+                            if (user != null) {
+                                val sharedPref = context.getSharedPreferences("UserSession", Context.MODE_PRIVATE)
+                                sharedPref.edit().apply {
+                                    putBoolean("isLoggedIn", true)
+                                    val uName = user.userMetadata?.get("username")?.jsonPrimitive?.content
+                                        ?: user.email?.substringBefore("@")
+                                        ?: "User"
+                                    putString("username", uName)
+                                    putString("email", user.email ?: "")
+                                    putString("userId", user.id)
+                                    apply()
+                                }
+                                Toast.makeText(context, "Login berhasil", Toast.LENGTH_SHORT).show()
+                                navController.navigate("dashboard") {
+                                    popUpTo("login") { inclusive = true }
+                                }
+                            } else {
+                                Toast.makeText(context, "Gagal mengambil data user", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            Toast.makeText(context, "Login gagal: ${e.localizedMessage ?: "Email atau Password salah"}", Toast.LENGTH_LONG).show()
                         }
-                        Toast.makeText(context, "Login berhasil", Toast.LENGTH_SHORT).show()
-                        navController.navigate("dashboard") {
-                            popUpTo("login") { inclusive = true }
-                        }
-                    } else {
-                        Toast.makeText(context, "Username/Email atau Password salah", Toast.LENGTH_SHORT).show()
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryContainer),

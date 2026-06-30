@@ -44,6 +44,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.timetracker.DatabaseHelper
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import io.github.jan.supabase.gotrue.auth
+import io.github.jan.supabase.gotrue.providers.builtin.Email
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import com.example.timetracker.SupabaseManager
 import com.example.timetracker.ui.theme.ManropeFontFamily
 import com.example.timetracker.ui.theme.OnPrimaryFixed
 import com.example.timetracker.ui.theme.OnSurface
@@ -57,6 +64,7 @@ import com.example.timetracker.ui.theme.WarmBackground
 fun RegisterScreen(navController: NavController) {
     val context = LocalContext.current
     val dbHelper = remember { DatabaseHelper(context) }
+    val coroutineScope = rememberCoroutineScope()
 
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -231,24 +239,23 @@ fun RegisterScreen(navController: NavController) {
                         return@Button
                     }
 
-                    if (dbHelper.isUsernameTaken(trimUser)) {
-                        Toast.makeText(context, "Username sudah digunakan", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-
-                    if (dbHelper.isEmailTaken(trimEmail)) {
-                        Toast.makeText(context, "Email sudah digunakan", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-
-                    val result = dbHelper.addUser(trimUser, trimEmail, trimPass)
-                    if (result > -1) {
-                        Toast.makeText(context, "Registrasi berhasil", Toast.LENGTH_SHORT).show()
-                        navController.navigate("login") {
-                            popUpTo("register") { inclusive = true }
+                    coroutineScope.launch {
+                        try {
+                            SupabaseManager.client.auth.signUpWith(Email) {
+                                this.email = trimEmail
+                                this.password = trimPass
+                                this.data = buildJsonObject {
+                                    put("username", trimUser)
+                                }
+                            }
+                            Toast.makeText(context, "Registrasi berhasil! Silakan login.", Toast.LENGTH_LONG).show()
+                            navController.navigate("login") {
+                                popUpTo("register") { inclusive = true }
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            Toast.makeText(context, "Registrasi gagal: ${e.localizedMessage ?: "Terjadi kesalahan"}", Toast.LENGTH_LONG).show()
                         }
-                    } else {
-                        Toast.makeText(context, "Registrasi gagal", Toast.LENGTH_SHORT).show()
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryContainer),

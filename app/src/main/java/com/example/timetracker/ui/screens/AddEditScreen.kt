@@ -20,8 +20,11 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,7 +50,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.timetracker.DatabaseHelper
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.example.timetracker.SupabaseManager
+import com.example.timetracker.ActivityRecordDto
+import android.content.Context
 import com.example.timetracker.ui.theme.ManropeFontFamily
 import com.example.timetracker.ui.theme.OnPrimaryFixed
 import com.example.timetracker.ui.theme.OnSurface
@@ -56,6 +63,8 @@ import com.example.timetracker.ui.theme.Outline
 import com.example.timetracker.ui.theme.Primary
 import com.example.timetracker.ui.theme.PrimaryContainer
 import com.example.timetracker.ui.theme.WarmBackground
+import com.example.timetracker.ui.theme.ErrorContainer
+import com.example.timetracker.ui.theme.OnErrorContainer
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -64,15 +73,132 @@ import java.util.Locale
 @Composable
 fun AddEditScreen(navController: NavController) {
     val context = LocalContext.current
-    val dbHelper = remember { DatabaseHelper(context) }
+    val sharedPref = remember { context.getSharedPreferences("UserSession", Context.MODE_PRIVATE) }
+    val userId = sharedPref.getString("userId", "") ?: ""
+    val coroutineScope = rememberCoroutineScope()
 
     var activityName by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
-    var project by remember { mutableStateOf("Work") }
+    var project by remember { mutableStateOf("") }
     var durationText by remember { mutableStateOf("45") }
     
     var projectDropdownExpanded by remember { mutableStateOf(false) }
-    val projectList = listOf("Work", "Education", "Personal", "Health", "Hobby", "Finance", "Social")
+    var projectList by remember { mutableStateOf<List<String>>(emptyList()) }
+    var refreshProjectTrigger by remember { mutableStateOf(0) }
+    var showAddProjectDialog by remember { mutableStateOf(false) }
+    var newProjectName by remember { mutableStateOf("") }
+    var projectToDelete by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(refreshProjectTrigger) {
+        projectList = SupabaseManager.getAllProjects()
+        if (project.isEmpty() && projectList.isNotEmpty()) {
+            project = projectList.first()
+        }
+    }
+
+    // AlertDialog for Adding New Project
+    if (showAddProjectDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showAddProjectDialog = false
+                newProjectName = ""
+            },
+            title = { Text("Add New Project", fontFamily = ManropeFontFamily, fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = newProjectName,
+                    onValueChange = { newProjectName = it },
+                    label = { Text("Project Name", fontFamily = ManropeFontFamily) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Primary,
+                        focusedLabelColor = Primary
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val trimmed = newProjectName.trim()
+                        if (trimmed.isNotEmpty()) {
+                            coroutineScope.launch {
+                                val res = SupabaseManager.addProject(trimmed)
+                                if (res) {
+                                    refreshProjectTrigger++
+                                    showAddProjectDialog = false
+                                    newProjectName = ""
+                                    Toast.makeText(context, "Project added successfully", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Project already exists or error occurred", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } else {
+                            Toast.makeText(context, "Name cannot be empty", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                ) {
+                    Text("Add", color = Color.White)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        showAddProjectDialog = false
+                        newProjectName = ""
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Outline)
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // AlertDialog for Confirming Project Deletion
+    projectToDelete?.let { proj ->
+        AlertDialog(
+            onDismissRequest = { projectToDelete = null },
+            title = { Text("Delete Project", fontFamily = ManropeFontFamily, fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to delete the project \"$proj\"?", fontFamily = ManropeFontFamily) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            val deleted = SupabaseManager.deleteProject(proj)
+                            if (deleted) {
+                                refreshProjectTrigger++
+                                if (project == proj) {
+                                    project = if (projectList.size > 1) {
+                                        projectList.filter { it != proj }.first()
+                                    } else {
+                                        ""
+                                    }
+                                }
+                                Toast.makeText(context, "Project deleted", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Failed to delete project", Toast.LENGTH_SHORT).show()
+                            }
+                            projectToDelete = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorContainer)
+                ) {
+                    Text("Delete", color = OnErrorContainer)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { projectToDelete = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Outline)
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -156,9 +282,48 @@ fun AddEditScreen(navController: NavController) {
                             onClick = {
                                 project = proj
                                 projectDropdownExpanded = false
+                            },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        projectToDelete = proj
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Delete",
+                                        tint = Color.Red.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         )
                     }
+
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = Primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Add New Project",
+                                    fontFamily = ManropeFontFamily,
+                                    color = Primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        },
+                        onClick = {
+                            projectDropdownExpanded = false
+                            showAddProjectDialog = true
+                        }
+                    )
                 }
             }
 
@@ -240,21 +405,26 @@ fun AddEditScreen(navController: NavController) {
                     val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
                     val startTime = sdf.format(Calendar.getInstance().time)
 
-                    val result = dbHelper.addActivity(
-                        name = trimName,
-                        project = project,
-                        category = category,
-                        duration = durationMinutes,
-                        notes = trimNotes,
-                        date = currentMillis,
-                        time = startTime
-                    )
+                    coroutineScope.launch {
+                        val success = SupabaseManager.addActivity(
+                            ActivityRecordDto(
+                                user_id = userId,
+                                activity_name = trimName,
+                                project = project,
+                                category = category,
+                                duration = durationMinutes,
+                                notes = trimNotes,
+                                date_millis = currentMillis,
+                                start_time = startTime
+                            )
+                        )
 
-                    if (result != -1L) {
-                        Toast.makeText(context, "Activity saved successfully!", Toast.LENGTH_SHORT).show()
-                        navController.popBackStack()
-                    } else {
-                        Toast.makeText(context, "Failed to save activity", Toast.LENGTH_SHORT).show()
+                        if (success) {
+                            Toast.makeText(context, "Activity saved successfully!", Toast.LENGTH_SHORT).show()
+                            navController.popBackStack()
+                        } else {
+                            Toast.makeText(context, "Failed to save activity", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryContainer),
