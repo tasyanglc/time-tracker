@@ -93,7 +93,9 @@ fun HomeScreen(navController: NavController) {
     
     Scaffold(
         topBar = {
-            MomentumTopBar()
+            val titles = listOf("Home", "History", "Start", "Reports", "Settings")
+            val currentTitle = titles.getOrElse(selectedNavItem) { "Home" }
+            MomentumTopBar(title = currentTitle)
         },
         bottomBar = {
             MomentumBottomNav(
@@ -140,7 +142,7 @@ fun HomeScreen(navController: NavController) {
 
 // TOP APP BAR
 @Composable
-fun MomentumTopBar(modifier: Modifier = Modifier) {
+fun MomentumTopBar(title: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val sharedPref = remember { context.getSharedPreferences("UserSession", Context.MODE_PRIVATE) }
     val username = sharedPref.getString("username", "User") ?: "User"
@@ -160,7 +162,7 @@ fun MomentumTopBar(modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "Momentum",
+                text = title,
                 fontFamily = ManropeFontFamily,
                 fontWeight = FontWeight.Black,
                 fontSize = 20.sp,
@@ -640,13 +642,6 @@ fun HistoryTabContent(dbHelper: DatabaseHelper) {
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = "History",
-            fontFamily = ManropeFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 24.sp,
-            color = OnSurface
-        )
 
         // Month Header
         Row(
@@ -826,17 +821,6 @@ fun PlayTabContent(dbHelper: DatabaseHelper, onSaved: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Text(
-            text = "Track Session",
-            fontFamily = ManropeFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 24.sp,
-            color = OnSurface,
-            modifier = Modifier.align(Alignment.Start)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         // Timer Display
         Card(
             modifier = Modifier
@@ -988,7 +972,7 @@ fun PlayTabContent(dbHelper: DatabaseHelper, onSaved: () -> Unit) {
                         }
 
                         val currentMillis = System.currentTimeMillis()
-                        val sdf = SimpleDateFormat("hh:mm AM", Locale.getDefault())
+                        val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
                         // Subtract elapsed seconds to estimate correct start time
                         val startCal = Calendar.getInstance().apply {
                             timeInMillis = currentMillis - (TimerState.secondsElapsed * 1000)
@@ -1011,6 +995,8 @@ fun PlayTabContent(dbHelper: DatabaseHelper, onSaved: () -> Unit) {
                             TimerState.isRunning = false
                             TimerState.isPaused = false
                             TimerState.secondsElapsed = 0
+                            TimerState.currentTaskName = ""
+                            TimerState.currentProject = ""
                             onSaved()
                         } else {
                             Toast.makeText(context, "Failed to save session", Toast.LENGTH_SHORT).show()
@@ -1079,13 +1065,6 @@ fun ReportsTabContent(dbHelper: DatabaseHelper) {
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = "Reports",
-            fontFamily = ManropeFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 24.sp,
-            color = OnSurface
-        )
 
         // Period Toggle Button Row
         Row(
@@ -1207,13 +1186,6 @@ fun SettingsTabContent(navController: NavController) {
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Text(
-            text = "Settings",
-            fontFamily = ManropeFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 24.sp,
-            color = OnSurface
-        )
 
         // Profile Card
         Card(
@@ -1312,6 +1284,8 @@ fun SettingsTabContent(navController: NavController) {
                 // Reset active timer if running
                 TimerState.isRunning = false
                 TimerState.secondsElapsed = 0
+                TimerState.currentTaskName = ""
+                TimerState.currentProject = ""
                 
                 navController.navigate("login") {
                     popUpTo("dashboard") { inclusive = true }

@@ -237,7 +237,7 @@ fun AddEditScreen(navController: NavController) {
                     }
 
                     val currentMillis = System.currentTimeMillis()
-                    val sdf = SimpleDateFormat("hh:mm AM", Locale.getDefault())
+                    val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
                     val startTime = sdf.format(Calendar.getInstance().time)
 
                     val result = dbHelper.addActivity(

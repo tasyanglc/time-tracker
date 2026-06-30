@@ -71,14 +71,6 @@ fun PrivacyPolicyScreen(navController: NavController) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Momentum Privacy Policy",
-                fontFamily = ManropeFontFamily,
-                fontWeight = FontWeight.Black,
-                fontSize = 24.sp,
-                color = OnSurface
-            )
-
-            Text(
                 text = "Last updated: June 24, 2026",
                 fontFamily = ManropeFontFamily,
                 fontWeight = FontWeight.Medium,
