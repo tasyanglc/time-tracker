@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.timetracker.ui.screens.*
 import com.example.timetracker.ui.theme.ThemeState
 import com.example.timetracker.ui.theme.TimetrackerTheme
@@ -38,7 +40,21 @@ class MainActivity : ComponentActivity() {
                         composable("login") { LoginScreen(navController) }
                         composable("register") { RegisterScreen(navController) }
                         composable("dashboard") { HomeScreen(navController) }
-                        composable("add_edit") { AddEditScreen(navController) }
+                        composable(
+                            route = "add_edit?activityId={activityId}",
+                            arguments = listOf(
+                                navArgument("activityId") {
+                                    type = NavType.StringType
+                                    nullable = true
+                                    defaultValue = null
+                                }
+                            )
+                        ) { backStackEntry ->
+                            val activityId = backStackEntry.arguments
+                                ?.getString("activityId")
+                                ?.toIntOrNull()
+                            AddEditScreen(navController, activityId)
+                        }
                         composable("privacy_policy") { PrivacyPolicyScreen(navController) }
                     }
                 }

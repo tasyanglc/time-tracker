@@ -50,6 +50,7 @@ import kotlinx.coroutines.launch
 
 // DATA CLASSES
 data class ActivityItem(
+    val id: Int,
     val icon: ImageVector,
     val iconBgColor: Color,
     val iconTintColor: Color,
@@ -79,10 +80,10 @@ fun HomeScreen(navController: NavController) {
     val context = LocalContext.current
     val sharedPref = remember { context.getSharedPreferences("UserSession", Context.MODE_PRIVATE) }
     val userId = sharedPref.getString("userId", "") ?: ""
-    
+
     val scrollState = rememberScrollState()
     var selectedNavItem by rememberSaveable { mutableIntStateOf(0) }
-    
+
     // Ticker logic for global timer
     LaunchedEffect(TimerState.isRunning, TimerState.isPaused) {
         if (TimerState.isRunning && !TimerState.isPaused) {
@@ -95,7 +96,7 @@ fun HomeScreen(navController: NavController) {
 
     // Refresh triggers to refresh database lists when screens change
     var refreshTrigger by remember { mutableStateOf(0) }
-    
+
     Scaffold(
         topBar = {
             val titles = listOf("Home", "History", "Start", "Reports", "Settings")
@@ -131,9 +132,14 @@ fun HomeScreen(navController: NavController) {
                 ) {
                     TodaySummaryCard(userId, refreshTrigger)
                     ActiveTimerWidget(onTimerAction = { selectedNavItem = 2 })
-                    RecentActivitiesSection(userId, refreshTrigger)
+                    RecentActivitiesSection(
+                        userId = userId,
+                        refreshTrigger = refreshTrigger,
+                        navController = navController,
+                        onActivityChanged = { refreshTrigger++ }
+                    )
                 }
-                1 -> HistoryTabContent(userId)
+                1 -> HistoryTabContent(userId, navController)
                 2 -> PlayTabContent(userId, onSaved = {
                     refreshTrigger++
                     selectedNavItem = 0
@@ -199,15 +205,15 @@ fun MomentumTopBar(title: String, modifier: Modifier = Modifier) {
 @Composable
 fun TodaySummaryCard(userId: String, refreshTrigger: Int) {
     var todayRecords by remember { mutableStateOf<List<ActivityRecord>>(emptyList()) }
-    
+
     LaunchedEffect(refreshTrigger) {
         todayRecords = SupabaseManager.getActivitiesByDate(userId, System.currentTimeMillis())
     }
-    
+
     val totalMinutes = todayRecords.sumOf { it.duration }
     val hours = totalMinutes / 60
     val mins = totalMinutes % 60
-    
+
     // Daily goal is 8 hours (480 minutes)
     val percentage = if (totalMinutes > 0) (totalMinutes * 100 / 480).coerceAtMost(100) else 0
 
@@ -458,9 +464,16 @@ fun TimerControlButton(
 
 // RECENT ACTIVITIES SECTION
 @Composable
-fun RecentActivitiesSection(userId: String, refreshTrigger: Int) {
+fun RecentActivitiesSection(
+    userId: String,
+    refreshTrigger: Int,
+    navController: NavController,
+    onActivityChanged: () -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var records by remember { mutableStateOf<List<ActivityRecord>>(emptyList()) }
-    
+
     LaunchedEffect(refreshTrigger) {
         records = SupabaseManager.getAllActivities(userId).takeLast(3).reversed()
     }
@@ -520,104 +533,197 @@ fun RecentActivitiesSection(userId: String, refreshTrigger: Int) {
                         else -> Primary
                     }
 
-                    ActivityCard(
-                        ActivityItem(
-                            icon = icon,
-                            iconBgColor = iconBg,
-                            iconTintColor = iconTint,
-                            title = record.name,
-                            timeRange = "${record.startTime} • ${record.project}",
-                            duration = "${record.duration}m"
+                    key(record.id) {
+                        ActivityCard(
+                            activity = ActivityItem(
+                                id = record.id,
+                                icon = icon,
+                                iconBgColor = iconBg,
+                                iconTintColor = iconTint,
+                                title = record.name,
+                                timeRange = "${record.startTime} • ${record.project}",
+                                duration = "${record.duration}m"
+                            ),
+                            onEdit = {
+                                navController.navigate("add_edit?activityId=${record.id}")
+                            },
+                            onDelete = {
+                                coroutineScope.launch {
+                                    val success = SupabaseManager.deleteActivity(record.id)
+                                    if (success) {
+                                        Toast.makeText(context, "Activity deleted", Toast.LENGTH_SHORT).show()
+                                        onActivityChanged()
+                                    } else {
+                                        Toast.makeText(context, "Failed to delete activity", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
                         )
-                    )
+                    }
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ActivityCard(activity: ActivityItem) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 2.dp,
-                shape = RoundedCornerShape(20.dp),
-                spotColor = Color(0x0D4A3F10),
-                ambientColor = Color(0x0D4A3F10),
-            ),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = SurfaceContainerLowest,
-        ),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(activity.iconBgColor),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = activity.icon,
-                        contentDescription = activity.title,
-                        tint = activity.iconTintColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+fun ActivityCard(
+    activity: ActivityItem,
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {}
+) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
-                Column {
-                    Text(
-                        text = activity.title,
-                        fontFamily = ManropeFontFamily,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        color = OnSurface,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = activity.timeRange,
-                        fontFamily = ManropeFontFamily,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 12.sp,
-                        color = Outline,
-                    )
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                showDeleteDialog = true
+            }
+            // Selalu return false agar kartu otomatis kembali ke posisi semula;
+            // penghapusan sesungguhnya baru terjadi setelah dikonfirmasi lewat dialog.
+            false
+        }
+    )
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Activity", fontFamily = ManropeFontFamily, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Are you sure you want to delete \"${activity.title}\"? This action cannot be undone.",
+                    fontFamily = ManropeFontFamily
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteDialog = false
+                        onDelete()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorContainer, contentColor = OnErrorContainer)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showDeleteDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Outline)
+                ) {
+                    Text("Cancel")
                 }
             }
+        )
+    }
 
-            Text(
-                text = activity.duration,
-                fontFamily = ManropeFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = OnSurfaceVariant,
-            )
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = Modifier.fillMaxWidth(),
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFFE53935))
+                    .padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete Activity",
+                    tint = Color.White
+                )
+            }
+        }
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onEdit() }
+                .shadow(
+                    elevation = 2.dp,
+                    shape = RoundedCornerShape(20.dp),
+                    spotColor = Color(0x0D4A3F10),
+                    ambientColor = Color(0x0D4A3F10),
+                ),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = SurfaceContainerLowest,
+            ),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(activity.iconBgColor),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = activity.icon,
+                            contentDescription = activity.title,
+                            tint = activity.iconTintColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Column {
+                        Text(
+                            text = activity.title,
+                            fontFamily = ManropeFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            color = OnSurface,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = activity.timeRange,
+                            fontFamily = ManropeFontFamily,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 12.sp,
+                            color = Outline,
+                        )
+                    }
+                }
+
+                Text(
+                    text = activity.duration,
+                    fontFamily = ManropeFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = OnSurfaceVariant,
+                )
+            }
         }
     }
 }
 
 // HISTORY TAB CONTENT
 @Composable
-fun HistoryTabContent(userId: String) {
+fun HistoryTabContent(userId: String, navController: NavController) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val calendar = remember { Calendar.getInstance() }
     var selectedDate by remember { mutableStateOf(calendar.timeInMillis) }
-    
+
     val selectedCal = remember(selectedDate) {
         Calendar.getInstance().apply { timeInMillis = selectedDate }
     }
-    
+
     val currentMonthYear = remember(selectedDate) {
         val sdf = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
         sdf.format(selectedCal.time)
@@ -636,7 +742,8 @@ fun HistoryTabContent(userId: String) {
     }
 
     var records by remember { mutableStateOf<List<ActivityRecord>>(emptyList()) }
-    LaunchedEffect(selectedDate) {
+    var historyRefreshTrigger by remember { mutableStateOf(0) }
+    LaunchedEffect(selectedDate, historyRefreshTrigger) {
         records = SupabaseManager.getActivitiesByDate(userId, selectedDate)
     }
     val totalTime = records.sumOf { it.duration }
@@ -661,7 +768,7 @@ fun HistoryTabContent(userId: String) {
             }) {
                 Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Prev", tint = Primary)
             }
-            
+
             Text(
                 text = currentMonthYear,
                 fontFamily = ManropeFontFamily,
@@ -689,7 +796,7 @@ fun HistoryTabContent(userId: String) {
             // Display days of the week in a simpler list: showing 7 days around selected date
             val centerCal = Calendar.getInstance().apply { timeInMillis = selectedDate }
             val centerDay = centerCal.get(Calendar.DAY_OF_MONTH)
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -697,12 +804,12 @@ fun HistoryTabContent(userId: String) {
                 // Show 7 days around the selected date
                 val startCal = centerCal.clone() as Calendar
                 startCal.add(Calendar.DAY_OF_MONTH, -3)
-                
+
                 (0..6).forEach { _ ->
                     val time = startCal.timeInMillis
                     val dayNum = startCal.get(Calendar.DAY_OF_MONTH)
                     val isSelected = isSameDay(time, selectedDate)
-                    
+
                     Box(
                         modifier = Modifier
                             .size(40.dp)
@@ -773,7 +880,7 @@ fun HistoryTabContent(userId: String) {
                     }
                 }
             } else {
-                items(records) { record ->
+                items(records, key = { it.id }) { record ->
                     val icon = when (record.category) {
                         "Admin" -> Icons.Outlined.Email
                         "Leisure" -> Icons.Outlined.LocalCafe
@@ -794,14 +901,29 @@ fun HistoryTabContent(userId: String) {
                     }
 
                     ActivityCard(
-                        ActivityItem(
+                        activity = ActivityItem(
+                            id = record.id,
                             icon = icon,
                             iconBgColor = iconBg,
                             iconTintColor = iconTint,
                             title = record.name,
                             timeRange = "${record.startTime} • ${record.project}",
                             duration = "${record.duration}m"
-                        )
+                        ),
+                        onEdit = {
+                            navController.navigate("add_edit?activityId=${record.id}")
+                        },
+                        onDelete = {
+                            coroutineScope.launch {
+                                val success = SupabaseManager.deleteActivity(record.id)
+                                if (success) {
+                                    Toast.makeText(context, "Activity deleted", Toast.LENGTH_SHORT).show()
+                                    historyRefreshTrigger++
+                                } else {
+                                    Toast.makeText(context, "Failed to delete activity", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
                     )
                 }
             }
@@ -815,7 +937,7 @@ fun PlayTabContent(userId: String, onSaved: () -> Unit) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var isProjectDropdownExpanded by remember { mutableStateOf(false) }
-    
+
     var projectList by remember { mutableStateOf<List<String>>(emptyList()) }
     var refreshProjectTrigger by remember { mutableStateOf(0) }
     var showAddProjectDialog by remember { mutableStateOf(false) }
@@ -1123,7 +1245,7 @@ fun PlayTabContent(userId: String, onSaved: () -> Unit) {
                         val durationMins = (TimerState.secondsElapsed / 60).coerceAtLeast(1).toInt()
                         val taskName = TimerState.currentTaskName.trim().ifEmpty { "Active Session" }
                         val projectSelected = TimerState.currentProject
-                        
+
                         // Infer category
                         val category = when {
                             taskName.contains("mail", true) || taskName.contains("admin", true) || taskName.contains("sync", true) -> "Admin"
@@ -1189,7 +1311,7 @@ fun ReportsTabContent(userId: String) {
     LaunchedEffect(period) {
         allActivities = SupabaseManager.getAllActivities(userId)
     }
-    
+
     val filteredActivities = remember(period, allActivities) {
         val calendar = Calendar.getInstance()
         val now = calendar.timeInMillis
@@ -1342,7 +1464,7 @@ fun SettingsTabContent(navController: NavController) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val sharedPref = remember { context.getSharedPreferences("UserSession", Context.MODE_PRIVATE) }
-    
+
     val username = sharedPref.getString("username", "User") ?: "User"
     val email = sharedPref.getString("email", "user@example.com") ?: "user@example.com"
 
@@ -1399,7 +1521,7 @@ fun SettingsTabContent(navController: NavController) {
         // Settings items
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingsItem(icon = Icons.Outlined.Notifications, title = "Notification Settings")
-            
+
             // Dark Mode Item with Switch
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -1433,7 +1555,7 @@ fun SettingsTabContent(navController: NavController) {
                     )
                 }
             }
-            
+
             SettingsItem(
                 icon = Icons.Outlined.PrivacyTip,
                 title = "Privacy Policy",
@@ -1465,7 +1587,7 @@ fun SettingsTabContent(navController: NavController) {
                     TimerState.secondsElapsed = 0
                     TimerState.currentTaskName = ""
                     TimerState.currentProject = ""
-                    
+
                     navController.navigate("login") {
                         popUpTo("dashboard") { inclusive = true }
                     }
@@ -1682,5 +1804,5 @@ private fun isSameDay(t1: Long, t2: Long): Boolean {
     val cal1 = Calendar.getInstance().apply { timeInMillis = t1 }
     val cal2 = Calendar.getInstance().apply { timeInMillis = t2 }
     return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-           cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+            cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
 }

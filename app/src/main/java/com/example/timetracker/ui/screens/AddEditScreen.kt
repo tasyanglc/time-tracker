@@ -71,7 +71,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddEditScreen(navController: NavController) {
+fun AddEditScreen(navController: NavController, activityId: Int? = null) {
     val context = LocalContext.current
     val sharedPref = remember { context.getSharedPreferences("UserSession", Context.MODE_PRIVATE) }
     val userId = sharedPref.getString("userId", "") ?: ""
@@ -81,13 +81,29 @@ fun AddEditScreen(navController: NavController) {
     var notes by remember { mutableStateOf("") }
     var project by remember { mutableStateOf("") }
     var durationText by remember { mutableStateOf("45") }
-    
+
     var projectDropdownExpanded by remember { mutableStateOf(false) }
     var projectList by remember { mutableStateOf<List<String>>(emptyList()) }
     var refreshProjectTrigger by remember { mutableStateOf(0) }
     var showAddProjectDialog by remember { mutableStateOf(false) }
     var newProjectName by remember { mutableStateOf("") }
     var projectToDelete by remember { mutableStateOf<String?>(null) }
+
+    // Memuat data lama jika dalam Mode Edit (activityId tidak null)
+    LaunchedEffect(activityId) {
+        if (activityId != null) {
+            coroutineScope.launch {
+                val allActivities = SupabaseManager.getAllActivities(userId)
+                val targetRecord = allActivities.find { it.id == activityId }
+                targetRecord?.let {
+                    activityName = it.name
+                    notes = it.notes
+                    project = it.project
+                    durationText = it.duration.toString()
+                }
+            }
+        }
+    }
 
     LaunchedEffect(refreshProjectTrigger) {
         projectList = SupabaseManager.getAllProjects()
@@ -205,7 +221,7 @@ fun AddEditScreen(navController: NavController) {
             TopAppBar(
                 title = {
                     Text(
-                        text = "New Activity",
+                        text = if (activityId == null) "New Activity" else "Edit Activity",
                         fontFamily = ManropeFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
@@ -270,7 +286,7 @@ fun AddEditScreen(navController: NavController) {
                     ),
                     shape = RoundedCornerShape(16.dp)
                 )
-                
+
                 DropdownMenu(
                     expanded = projectDropdownExpanded,
                     onDismissRequest = { projectDropdownExpanded = false },
@@ -406,21 +422,26 @@ fun AddEditScreen(navController: NavController) {
                     val startTime = sdf.format(Calendar.getInstance().time)
 
                     coroutineScope.launch {
-                        val success = SupabaseManager.addActivity(
-                            ActivityRecordDto(
-                                user_id = userId,
-                                activity_name = trimName,
-                                project = project,
-                                category = category,
-                                duration = durationMinutes,
-                                notes = trimNotes,
-                                date_millis = currentMillis,
-                                start_time = startTime
-                            )
+                        val recordDto = ActivityRecordDto(
+                            user_id = userId,
+                            activity_name = trimName,
+                            project = project,
+                            category = category,
+                            duration = durationMinutes,
+                            notes = trimNotes,
+                            date_millis = currentMillis,
+                            start_time = startTime
                         )
 
+                        // Eksekusi Update jika Mode Edit, atau Insert jika Mode Baru
+                        val success = if (activityId != null) {
+                            SupabaseManager.updateActivity(activityId, recordDto)
+                        } else {
+                            SupabaseManager.addActivity(recordDto)
+                        }
+
                         if (success) {
-                            Toast.makeText(context, "Activity saved successfully!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, if (activityId == null) "Activity saved successfully!" else "Activity updated successfully!", Toast.LENGTH_SHORT).show()
                             navController.popBackStack()
                         } else {
                             Toast.makeText(context, "Failed to save activity", Toast.LENGTH_SHORT).show()
@@ -434,7 +455,7 @@ fun AddEditScreen(navController: NavController) {
                     .height(56.dp)
             ) {
                 Text(
-                    text = "Save Activity",
+                    text = if (activityId == null) "Save Activity" else "Save Changes",
                     fontFamily = ManropeFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,

@@ -147,4 +147,36 @@ object SupabaseManager {
             false
         }
     }
+
+    // ==========================================
+    // TAMBAHAN BARU UNTUK FITUR EDIT & HAPUS
+    // ==========================================
+
+    suspend fun updateActivity(activityId: Int, updatedRecord: ActivityRecordDto): Boolean {
+        return try {
+            client.postgrest["activities"].update(updatedRecord) {
+                filter {
+                    eq("id", activityId)
+                }
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun deleteActivity(activityId: Int): Boolean {
+        return try {
+            client.postgrest["activities"].delete {
+                filter {
+                    eq("id", activityId)
+                }
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
 }
