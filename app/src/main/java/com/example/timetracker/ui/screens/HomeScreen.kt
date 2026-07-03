@@ -1520,7 +1520,11 @@ fun SettingsTabContent(navController: NavController) {
 
         // Settings items
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SettingsItem(icon = Icons.Outlined.Notifications, title = "Notification Settings")
+            SettingsItem(
+                icon = Icons.Outlined.Notifications,
+                title = "Notification Settings",
+                onClick = { navController.navigate("notification_settings") }
+            )
 
             // Dark Mode Item with Switch
             Card(

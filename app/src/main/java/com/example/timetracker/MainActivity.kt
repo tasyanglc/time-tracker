@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
                         composable("login") { LoginScreen(navController) }
                         composable("register") { RegisterScreen(navController) }
                         composable("dashboard") { HomeScreen(navController) }
+                        composable("notification_settings") { NotificationSettingsScreen(navController) }
                         composable(
                             route = "add_edit?activityId={activityId}",
                             arguments = listOf(
