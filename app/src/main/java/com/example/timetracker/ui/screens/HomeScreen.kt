@@ -544,7 +544,7 @@ fun RecentActivitiesSection(
                                 timeRange = "${record.startTime} • ${record.project}",
                                 duration = "${record.duration}m"
                             ),
-                            onEdit = {
+                            onClick = {
                                 navController.navigate("add_edit?activityId=${record.id}")
                             },
                             onDelete = {
@@ -570,7 +570,7 @@ fun RecentActivitiesSection(
 @Composable
 fun ActivityCard(
     activity: ActivityItem,
-    onEdit: () -> Unit = {},
+    onClick: () -> Unit = {},
     onDelete: () -> Unit = {}
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -643,7 +643,7 @@ fun ActivityCard(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onEdit() }
+                .clickable { onClick() }
                 .shadow(
                     elevation = 2.dp,
                     shape = RoundedCornerShape(20.dp),
@@ -910,7 +910,7 @@ fun HistoryTabContent(userId: String, navController: NavController) {
                             timeRange = "${record.startTime} • ${record.project}",
                             duration = "${record.duration}m"
                         ),
-                        onEdit = {
+                        onClick = {
                             navController.navigate("add_edit?activityId=${record.id}")
                         },
                         onDelete = {

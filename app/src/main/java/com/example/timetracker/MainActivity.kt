@@ -57,6 +57,15 @@ class MainActivity : ComponentActivity() {
                             AddEditScreen(navController, activityId)
                         }
                         composable("privacy_policy") { PrivacyPolicyScreen(navController) }
+                        composable(
+                            route = "activity_detail/{activityId}",
+                            arguments = listOf(
+                                navArgument("activityId") { type = NavType.IntType }
+                            )
+                        ) { backStackEntry ->
+                            val activityId = backStackEntry.arguments?.getInt("activityId") ?: -1
+                            ActivityDetailScreen(navController, activityId)
+                        }
                     }
                 }
             }
