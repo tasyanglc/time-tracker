@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "timetracker"
+rootProject.name = "momentum"
 include(":app")
