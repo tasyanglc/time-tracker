@@ -193,6 +193,13 @@ fun AddEditScreen(navController: NavController, activityId: Int? = null) {
                                         ""
                                     }
                                 }
+                                if (TimerState.currentProject == proj) {
+                                     TimerState.currentProject = if (projectList.size > 1) {
+                                         projectList.filter { it != proj }.first()
+                                     } else {
+                                         ""
+                                     }
+                                 }
                                 Toast.makeText(context, "Project deleted", Toast.LENGTH_SHORT).show()
                             } else {
                                 Toast.makeText(context, "Failed to delete project", Toast.LENGTH_SHORT).show()
