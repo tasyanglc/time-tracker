@@ -21,9 +21,14 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -82,6 +87,11 @@ fun AddEditScreen(navController: NavController, activityId: Int? = null) {
     var project by remember { mutableStateOf("") }
     var durationText by remember { mutableStateOf("45") }
 
+    val calendar = remember { Calendar.getInstance() }
+    var selectedDateMillis by remember { mutableStateOf(calendar.timeInMillis) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var startTimeState by remember { mutableStateOf("") }
+
     var projectDropdownExpanded by remember { mutableStateOf(false) }
     var projectList by remember { mutableStateOf<List<String>>(emptyList()) }
     var refreshProjectTrigger by remember { mutableStateOf(0) }
@@ -100,6 +110,8 @@ fun AddEditScreen(navController: NavController, activityId: Int? = null) {
                     notes = it.notes
                     project = it.project
                     durationText = it.duration.toString()
+                    selectedDateMillis = it.dateMillis
+                    startTimeState = it.startTime
                 }
             }
         }
@@ -350,6 +362,39 @@ fun AddEditScreen(navController: NavController, activityId: Int? = null) {
                 }
             }
 
+            // Date Field (Clickable to open DatePicker)
+            val dateString = remember(selectedDateMillis) {
+                SimpleDateFormat("dd MMMM yyyy", Locale.getDefault()).format(selectedDateMillis)
+            }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = dateString,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Date", fontFamily = ManropeFontFamily) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            tint = Primary
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Primary,
+                        focusedLabelColor = Primary,
+                        unfocusedBorderColor = Outline.copy(alpha = 0.5f)
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                // Overlay Box to capture clicks safely
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clickable { showDatePicker = true }
+                )
+            }
+
             // Duration Field
             OutlinedTextField(
                 value = durationText,
@@ -424,9 +469,12 @@ fun AddEditScreen(navController: NavController, activityId: Int? = null) {
                         else -> "Focus"
                     }
 
-                    val currentMillis = System.currentTimeMillis()
                     val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
-                    val startTime = sdf.format(Calendar.getInstance().time)
+                    val startTime = if (activityId != null && startTimeState.isNotEmpty()) {
+                        startTimeState
+                    } else {
+                        sdf.format(Calendar.getInstance().time)
+                    }
 
                     coroutineScope.launch {
                         val recordDto = ActivityRecordDto(
@@ -436,7 +484,7 @@ fun AddEditScreen(navController: NavController, activityId: Int? = null) {
                             category = category,
                             duration = durationMinutes,
                             notes = trimNotes,
-                            date_millis = currentMillis,
+                            date_millis = selectedDateMillis,
                             start_time = startTime
                         )
 
@@ -469,6 +517,32 @@ fun AddEditScreen(navController: NavController, activityId: Int? = null) {
                     color = OnPrimaryFixed
                 )
             }
+        }
+    }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDateMillis
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        selectedDateMillis = datePickerState.selectedDateMillis ?: selectedDateMillis
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("OK", fontFamily = ManropeFontFamily, fontWeight = FontWeight.Bold, color = Primary)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel", fontFamily = ManropeFontFamily, color = Outline)
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }
