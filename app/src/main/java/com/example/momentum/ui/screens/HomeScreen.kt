@@ -50,6 +50,9 @@ import kotlinx.coroutines.launch
 import android.net.Uri
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
 
 // DATA CLASSES
 data class ActivityItem(
@@ -100,6 +103,19 @@ fun HomeScreen(navController: NavController) {
     // Refresh triggers to refresh database lists when screens change
     var refreshTrigger by remember { mutableStateOf(0) }
 
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshTrigger++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     Scaffold(
         topBar = {
             val titles = listOf("Home", "History", "Start", "Reports", "Settings")
@@ -142,12 +158,12 @@ fun HomeScreen(navController: NavController) {
                         onActivityChanged = { refreshTrigger++ }
                     )
                 }
-                1 -> HistoryTabContent(userId, navController)
+                1 -> HistoryTabContent(userId, refreshTrigger, navController)
                 2 -> PlayTabContent(userId, onSaved = {
                     refreshTrigger++
                     selectedNavItem = 0
                 })
-                3 -> ReportsTabContent(userId)
+                3 -> ReportsTabContent(userId, refreshTrigger)
                 4 -> SettingsTabContent(navController)
             }
         }
@@ -746,7 +762,7 @@ fun ActivityCard(
 
 // HISTORY TAB CONTENT
 @Composable
-fun HistoryTabContent(userId: String, navController: NavController) {
+fun HistoryTabContent(userId: String, refreshTrigger: Int = 0, navController: NavController) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val calendar = remember { Calendar.getInstance() }
@@ -775,7 +791,7 @@ fun HistoryTabContent(userId: String, navController: NavController) {
 
     var records by remember { mutableStateOf<List<ActivityRecord>>(emptyList()) }
     var historyRefreshTrigger by remember { mutableStateOf(0) }
-    LaunchedEffect(selectedDate, historyRefreshTrigger) {
+    LaunchedEffect(selectedDate, historyRefreshTrigger, refreshTrigger) {
         records = SupabaseManager.getActivitiesByDate(userId, selectedDate)
     }
     val totalTime = records.sumOf { it.duration }
@@ -1337,10 +1353,10 @@ fun PlayTabContent(userId: String, onSaved: () -> Unit) {
 
 // REPORTS TAB CONTENT
 @Composable
-fun ReportsTabContent(userId: String) {
+fun ReportsTabContent(userId: String, refreshTrigger: Int = 0) {
     var period by remember { mutableStateOf("Weekly") }
     var allActivities by remember { mutableStateOf<List<ActivityRecord>>(emptyList()) }
-    LaunchedEffect(period) {
+    LaunchedEffect(period, refreshTrigger) {
         allActivities = SupabaseManager.getAllActivities(userId)
     }
 
