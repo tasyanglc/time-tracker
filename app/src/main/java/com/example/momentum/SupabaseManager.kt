@@ -87,8 +87,10 @@ object SupabaseManager {
                 .select {
                     filter {
                         eq("user_id", userId)
-                        gte("date_millis", start)
-                        lte("date_millis", end)
+                        and {
+                            gte("date_millis", start)
+                            lte("date_millis", end)
+                        }
                     }
                 }
                 .decodeList<ActivityRecordDto>()
