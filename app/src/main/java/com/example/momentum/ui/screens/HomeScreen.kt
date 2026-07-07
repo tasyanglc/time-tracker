@@ -36,6 +36,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import android.content.Intent
+import com.example.momentum.TimerService
 import com.example.momentum.ActivityRecord
 import com.example.momentum.DatabaseHelper
 import com.example.momentum.ui.theme.*
@@ -90,15 +92,7 @@ fun HomeScreen(navController: NavController) {
     val scrollState = rememberScrollState()
     var selectedNavItem by rememberSaveable { mutableIntStateOf(0) }
 
-    // Ticker logic for global timer
-    LaunchedEffect(TimerState.isRunning, TimerState.isPaused) {
-        if (TimerState.isRunning && !TimerState.isPaused) {
-            while (true) {
-                delay(1000)
-                TimerState.secondsElapsed++
-            }
-        }
-    }
+    // Ticker logic removed from UI - now handled reliably by TimerService to support background tracking
 
     // Refresh triggers to refresh database lists when screens change
     var refreshTrigger by remember { mutableStateOf(0) }
@@ -376,6 +370,7 @@ fun TodaySummaryCard(userId: String, refreshTrigger: Int) {
 // ACTIVE TIMER WIDGET (HOME SHORTCUT)
 @Composable
 fun ActiveTimerWidget(onTimerAction: () -> Unit) {
+    val context = LocalContext.current
     val timeString = formatElapsedTime(TimerState.secondsElapsed)
 
     Box(
@@ -443,7 +438,12 @@ fun ActiveTimerWidget(onTimerAction: () -> Unit) {
                     TimerControlButton(
                         size = 48,
                         bgColor = Color.White.copy(alpha = 0.3f),
-                        onClick = { TimerState.isPaused = !TimerState.isPaused }
+                        onClick = { 
+                            TimerState.isPaused = !TimerState.isPaused 
+                            // Sync with notification
+                            val action = if (TimerState.isPaused) TimerService.ACTION_PAUSE else TimerService.ACTION_RESUME
+                            context.startService(Intent(context, TimerService::class.java).apply { this.action = action })
+                        }
                     ) {
                         Icon(
                             imageVector = if (TimerState.isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
@@ -471,6 +471,8 @@ fun ActiveTimerWidget(onTimerAction: () -> Unit) {
                             TimerState.isRunning = true
                             TimerState.isPaused = false
                             TimerState.secondsElapsed = 0
+                            // Start notification service
+                            context.startService(Intent(context, TimerService::class.java).apply { action = TimerService.ACTION_START })
                             onTimerAction()
                         }
                     ) {
@@ -1256,6 +1258,7 @@ fun PlayTabContent(userId: String, onSaved: () -> Unit) {
                         TimerState.isRunning = true
                         TimerState.isPaused = false
                         TimerState.secondsElapsed = 0
+                        context.startService(Intent(context, TimerService::class.java).apply { action = TimerService.ACTION_START })
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryContainer),
                     shape = RoundedCornerShape(50),
@@ -1268,7 +1271,11 @@ fun PlayTabContent(userId: String, onSaved: () -> Unit) {
             } else {
                 // PAUSE / RESUME Button
                 Button(
-                    onClick = { TimerState.isPaused = !TimerState.isPaused },
+                    onClick = { 
+                        TimerState.isPaused = !TimerState.isPaused 
+                        val action = if (TimerState.isPaused) TimerService.ACTION_PAUSE else TimerService.ACTION_RESUME
+                        context.startService(Intent(context, TimerService::class.java).apply { this.action = action })
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = SecondaryContainer),
                     shape = RoundedCornerShape(50),
                     modifier = Modifier.weight(1f).height(56.dp)
@@ -1326,6 +1333,9 @@ fun PlayTabContent(userId: String, onSaved: () -> Unit) {
 
                             if (success) {
                                 Toast.makeText(context, "Session saved: ${durationMins}m", Toast.LENGTH_SHORT).show()
+                                // Stop the service
+                                context.startService(Intent(context, TimerService::class.java).apply { action = TimerService.ACTION_STOP })
+                                
                                 // Reset state
                                 TimerState.isRunning = false
                                 TimerState.isPaused = false
@@ -1701,7 +1711,11 @@ fun SettingsTabContent(navController: NavController) {
                                 apply()
                             }
                             // Reset active timer if running
-                            TimerState.isRunning = false
+                            val intent = Intent(context, TimerService::class.java).apply {
+                                action = TimerService.ACTION_STOP
+                            }
+                            context.startService(intent)
+
                             TimerState.secondsElapsed = 0
                             TimerState.currentTaskName = ""
                             TimerState.currentProject = ""
